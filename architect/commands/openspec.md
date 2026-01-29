@@ -14,6 +14,7 @@ Convert architectural plans, current context, or task descriptions into validate
 ## Arguments
 
 Takes **any input**:
+
 - Plan file path: `.claude/plans/auth-feature-3k7f2-plan.md`
 - Task description: `"Add OAuth2 authentication with Google login"`
 - No argument: uses current conversation context
@@ -40,27 +41,42 @@ If not initialized: "Run: openspec init"
 **CRITICAL:** Determine input type and extract all relevant context.
 
 **If plan file path provided** (matches `.claude/plans/*.md` or similar):
+
 ```bash
 # Read the full plan file
 cat <plan-path>
 ```
 
 Extract from plan:
+
 - Task description → proposal.md overview
 - Architecture section → design.md
 - Implementation steps → tasks.md
-- Requirements → specs/*/spec.md
+- Requirements → specs/\*/spec.md
 - Files to modify → technical context
 
 **If task description provided** (text without file path):
 Use the description as the basis for the proposal. The agent will explore the codebase to gather context.
 
 **If no input** (empty $ARGUMENTS):
-Ask user: "What change would you like to propose?"
+Check for an active Claude plan in the current conversation context:
+
+```bash
+# Find most recent plan file
+ls -t .claude/plans/*-plan.md 2>/dev/null | head -1
+```
+
+1. **If plan exists in conversation context**: Use it automatically
+   - Look for plan file references in recent messages
+   - Check `.claude/plans/` for the most recently modified plan
+   - Inform user: "Using plan: .claude/plans/<plan-name>.md"
+
+2. **If no plan found**: Ask user: "What change would you like to propose?"
 
 ### Step 3: Determine Change ID
 
 Generate a unique verb-led change-id:
+
 - Use kebab-case
 - Start with action verb: `add-`, `update-`, `fix-`, `refactor-`, `remove-`
 - Be descriptive but concise
@@ -182,9 +198,11 @@ NEXT STEPS
 │ STEP 2: DETECT INPUT TYPE                                     │
 │                                                               │
 │  Plan file path:          Description:        Empty:          │
-│   • Read FULL plan         • Use as basis      • Ask user     │
-│   • Extract ALL sections   • Explore codebase                 │
-│   • Save plan_path         • No plan_ref                      │
+│   • Read FULL plan         • Use as basis      • Check context│
+│   • Extract ALL sections   • Explore codebase  • Use plan if  │
+│   • Save plan_path         • No plan_ref         found in     │
+│                                                  conversation │
+│                                                • Else ask user│
 └───────────────────────────────────────────────────────────────┘
     │
     ▼
@@ -277,26 +295,27 @@ Plan (SOURCE OF TRUTH)
 
 ## Error Handling
 
-| Scenario | Action |
-|----------|--------|
-| OpenSpec not installed | "Install OpenSpec: https://github.com/Fission-AI/OpenSpec" |
-| OpenSpec not initialized | "Run: openspec init" |
-| Plan file not found | Report error, suggest correct path |
-| Empty input | Ask user for description |
-| Validation fails | Report issues, agent attempts to fix |
-| Change ID exists | Append suffix: `add-auth-2` |
+| Scenario                 | Action                                                     |
+| ------------------------ | ---------------------------------------------------------- |
+| OpenSpec not installed   | "Install OpenSpec: https://github.com/Fission-AI/OpenSpec" |
+| OpenSpec not initialized | "Run: openspec init"                                       |
+| Plan file not found      | Report error, suggest correct path                         |
+| Empty input              | Ask user for description                                   |
+| Validation fails         | Report issues, agent attempts to fix                       |
+| Change ID exists         | Append suffix: `add-auth-2`                                |
 
 ## Example Usage
 
 ```bash
-# From architectural plan
+# From architectural plan (explicit path)
 /openspec .claude/plans/auth-feature-3k7f2-plan.md
 
 # From description
 /openspec Add OAuth2 authentication with Google login
 
-# From current context (after discussing feature)
+# From current context (auto-detects plan in conversation)
 /openspec
+# → "Using plan: .claude/plans/auth-feature-3k7f2-plan.md"
 
 # Then continue with workflow
 openspec show add-oauth2-authentication
@@ -308,35 +327,36 @@ openspec show add-oauth2-authentication
 
 How different inputs map to OpenSpec structure:
 
-| Input Section | → OpenSpec File | Content |
-|---------------|-----------------|---------|
-| Plan path | proposal.md | plan_reference (for recovery) |
-| Status/Mode | proposal.md / design.md | Plan status, implementation mode |
-| Summary/Task | proposal.md | Overview, motivation |
-| Architecture | design.md | Decisions, patterns |
-| Implementation Steps | tasks.md | Ordered task list |
-| Requirements | specs/*/spec.md | ADDED/MODIFIED/REMOVED |
-| Files to Modify | tasks.md + specs | File references |
-| Exit Criteria | tasks.md | Verification steps |
-| Risk Analysis | design.md | Technical/Integration risks, rollback strategy |
-| Stakeholders | proposal.md | Impact section (primary/secondary) |
-| Testing Strategy | tasks.md + specs | Unit/Integration tests, existing tests to update |
-| Success Metrics | tasks.md | Functional criteria, quality metrics, acceptance checklist |
-| Post-Implementation | tasks.md | Automated checks, validation steps, stakeholder notification |
+| Input Section        | → OpenSpec File         | Content                                                      |
+| -------------------- | ----------------------- | ------------------------------------------------------------ |
+| Plan path            | proposal.md             | plan_reference (for recovery)                                |
+| Status/Mode          | proposal.md / design.md | Plan status, implementation mode                             |
+| Summary/Task         | proposal.md             | Overview, motivation                                         |
+| Architecture         | design.md               | Decisions, patterns                                          |
+| Implementation Steps | tasks.md                | Ordered task list                                            |
+| Requirements         | specs/\*/spec.md        | ADDED/MODIFIED/REMOVED                                       |
+| Files to Modify      | tasks.md + specs        | File references                                              |
+| Exit Criteria        | tasks.md                | Verification steps                                           |
+| Risk Analysis        | design.md               | Technical/Integration risks, rollback strategy               |
+| Stakeholders         | proposal.md             | Impact section (primary/secondary)                           |
+| Testing Strategy     | tasks.md + specs        | Unit/Integration tests, existing tests to update             |
+| Success Metrics      | tasks.md                | Functional criteria, quality metrics, acceptance checklist   |
+| Post-Implementation  | tasks.md                | Automated checks, validation steps, stakeholder notification |
 
 ## Auto-Decomposition
 
 The agent **automatically** decomposes large plans - no user prompt needed.
 
-| Trigger | Threshold | Action |
-|---------|-----------|--------|
-| Subsystems | >2 unrelated areas | Auto-split by subsystem |
-| Total lines | >2000 lines | Auto-split by feature |
-| Dependencies | Complex ordering | Auto-split with depends_on |
+| Trigger      | Threshold          | Action                     |
+| ------------ | ------------------ | -------------------------- |
+| Subsystems   | >2 unrelated areas | Auto-split by subsystem    |
+| Total lines  | >2000 lines        | Auto-split by feature      |
+| Dependencies | Complex ordering   | Auto-split with depends_on |
 
 ### Decomposition Output
 
 When the agent auto-decomposes a large plan:
+
 ```
 ===============================================================
 OPENSPEC PROPOSALS CREATED (DECOMPOSED)
