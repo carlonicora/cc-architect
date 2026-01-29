@@ -22,16 +22,22 @@ Claude Code is powerful, but without structure it can:
 
 ## Install
 
+### cc-architect Plugin
+
 ```bash
-/plugin marketplace add carlonicora/architect-claude-code
-/plugin install architect@architect-claude-code
+# Add to marketplace
+/plugin marketplace add carlonicora/cc-architect
+
+# Install the architect plugin
+/plugin install architect@cc-architect
 ```
 
-**Dependencies:**
-| Tool | Install |
-|------|---------|
-| [OpenSpec](https://github.com/Fission-AI/OpenSpec) | Required for `/architect:openspec` |
-| [Beads](https://github.com/steveyegge/beads) | `brew tap steveyegge/beads && brew install bd` |
+### Dependencies
+
+| Tool                                               | Install                                                                          | Required For                               |
+| -------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------ |
+| [OpenSpec](https://github.com/Fission-AI/OpenSpec) | See [OpenSpec installation](https://github.com/Fission-AI/OpenSpec#installation) | `/architect:openspec`, `/architect:review` |
+| [Beads](https://github.com/steveyegge/beads)       | `brew tap steveyegge/beads && brew install bd`                                   | `/architect:beads`, `/architect:implement` |
 
 ## Commands
 
