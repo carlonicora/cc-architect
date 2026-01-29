@@ -24,6 +24,20 @@ This command provides a structured walkthrough that catches issues before code i
 
 ## Instructions
 
+## Content Presentation Rules
+
+**CRITICAL**: When presenting sections for review, you MUST:
+
+1. **Show COMPLETE content** - Copy verbatim from the spec file
+2. **Do NOT summarize** - No TL;DR versions, paraphrasing, or bullet-point condensations
+3. **Provide context for file lists** - When showing affected files, explain WHY each is affected
+4. **Chunk long content** - If >100 lines, present in logical chunks but show ALL of it
+5. **Quote actual text** - Use blockquotes or code blocks to show exact spec content
+
+**Why this matters**: Users cannot validate quality from summaries. They need to see
+the actual specification content that will drive implementation to catch errors,
+gaps, or misunderstandings BEFORE code is written.
+
 ### Step 1: Validate Environment
 
 ```bash
@@ -176,34 +190,7 @@ Use AskUserQuestion with:
 
 Handle "No" the same way as 4.1 - open discussion, edit, confirm.
 
-#### 4.3: Review "Impact" (Affected Code/Specs)
-
-Present the section:
-```
-===============================================================
-REVIEWING: Impact (Affected Code/Specs)
-===============================================================
-
-<content of "## Impact" section>
-
-===============================================================
-```
-
-Use AskUserQuestion:
-```
-Use AskUserQuestion with:
-- question: "Is the impact assessment complete? Are all affected areas identified?"
-- header: "Impact"
-- options:
-  - label: "Yes, continue"
-    description: "Impact assessment is complete, move to the next section"
-  - label: "No, needs changes"
-    description: "I have feedback or corrections for the impact"
-```
-
-Handle "No" the same way - open discussion, edit, confirm.
-
-#### 4.4: Review "Success Criteria"
+#### 4.3: Review "Success Criteria"
 
 Present the section:
 ```
@@ -232,7 +219,7 @@ Handle "No" the same way - open discussion, edit, confirm.
 
 **Cascading**: If success criteria change, also check and update tasks.md "Success Conditions" section.
 
-#### 4.5: Review "Out of Scope"
+#### 4.4: Review "Out of Scope"
 
 Present the section:
 ```
@@ -391,9 +378,45 @@ Use AskUserQuestion with:
 
 ### Step 6: Review Design.md (Remaining Sections)
 
-Review sections not covered during requirements review:
+Review sections not covered during requirements review.
 
-#### 6.1: Reference Implementation
+#### 6.1: Review "Impact" (Now that architecture is validated)
+
+Now that requirements and architectural decisions have been validated in Step 5,
+review the implementation impact from proposal.md.
+
+Present the COMPLETE section from proposal.md:
+```
+===============================================================
+REVIEWING: Impact (Implementation Details)
+===============================================================
+
+The requirements and architecture have been validated.
+Now let's review which files and systems are affected.
+
+<COMPLETE content of "## Impact" section from proposal.md - verbatim>
+
+===============================================================
+```
+
+Use AskUserQuestion:
+```
+Use AskUserQuestion with:
+- question: "Given the validated architecture, is the implementation impact correct?"
+- header: "Impact"
+- options:
+  - label: "Yes, continue"
+    description: "Impact assessment aligns with the validated approach"
+  - label: "No, needs changes"
+    description: "I have corrections for the impact assessment"
+```
+
+Handle "No" the same way - open discussion, edit, confirm.
+
+**Note**: If impact changes significantly, check if this affects the architecture
+decisions reviewed in Step 5. If so, inform the user and offer to revisit.
+
+#### 6.2: Reference Implementation
 
 If design.md has a "Reference Implementation" section with code:
 
@@ -427,7 +450,7 @@ Use AskUserQuestion with:
 
 Handle "No" with discussion → edit → confirm.
 
-#### 6.2: Migration Patterns
+#### 6.3: Migration Patterns
 
 If design.md has migration patterns:
 
@@ -456,7 +479,7 @@ Use AskUserQuestion with:
 
 Handle "No" with discussion → edit → confirm.
 
-#### 6.3: Risk Analysis
+#### 6.4: Risk Analysis
 
 If design.md has risk analysis:
 
@@ -573,7 +596,6 @@ Sections Reviewed:
   Proposal.md:
     [x] Why (Motivation)
     [x] What Changes (Scope)
-    [x] Impact
     [x] Success Criteria
     [x] Out of Scope
 
@@ -583,6 +605,7 @@ Sections Reviewed:
     ...
 
   Design.md:
+    [x] Impact (validated after architecture)
     [x] Reference Implementation
     [x] Migration Patterns
     [x] Risk Analysis
@@ -628,7 +651,7 @@ The OpenSpec has been validated and is ready for implementation.
 │  │ No → Discussion → Edit → Confirm → next section         │  │
 │  └─────────────────────────────────────────────────────────┘  │
 │                                                               │
-│  Sections: Why → What Changes → Impact → Criteria → Scope    │
+│  Sections: Why → What Changes → Criteria → Out of Scope      │
 └───────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -652,7 +675,8 @@ The OpenSpec has been validated and is ready for implementation.
 ┌───────────────────────────────────────────────────────────────┐
 │                    DESIGN.MD REVIEW                           │
 │                                                               │
-│  Reference Implementation → Migration Patterns → Risk Analysis│
+│  Impact (from proposal.md) → Ref Implementation →             │
+│  Migration Patterns → Risk Analysis                           │
 │  Same Yes/No pattern with immediate edits                     │
 └───────────────────────────────────────────────────────────────┘
                                     │
@@ -681,7 +705,8 @@ When editing one file, related files may need updates:
 |------|-------------|
 | Requirement in specs/*.md | Related tasks in tasks.md |
 | Success criteria in proposal.md | Success conditions in tasks.md |
-| Design decision in design.md | Reference implementation code in design.md |
+| Design decision in design.md | Reference implementation code in design.md, Impact section in proposal.md |
+| Impact in proposal.md | May require revisiting design decisions if files/scope changed significantly |
 | Task scope in tasks.md | Exit criteria commands |
 
 Always inform the user: "I've also updated <file> to reflect this change."
