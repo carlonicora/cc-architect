@@ -4,7 +4,7 @@ argument-hint: "[openspec-change-path]"
 description: Post-implementation verification using parallel specialized agents
 ---
 
-# Verify Command
+# Verify Implementation Command
 
 Post-implementation verification that validates written code against OpenSpec specifications, design documents, and architecture patterns. Uses **6 specialized agents running in parallel** for comprehensive analysis.
 
@@ -34,7 +34,7 @@ After implementation, code should be validated against:
 openspec version 2>&1 | head -1
 
 # Check openspec is initialized
-ls openspec/project.md 2>/dev/null && echo "OpenSpec initialized" || echo "Not initialized"
+ls openspec/config.yaml 2>/dev/null && echo "OpenSpec initialized" || echo "Not initialized"
 
 # CRITICAL: Check architecture docs exist
 ls docs/architecture/INDEX.md 2>/dev/null && echo "Architecture docs found" || echo "ERROR: Missing docs/architecture/INDEX.md"
@@ -97,8 +97,8 @@ Use AskUserQuestion with:
 - If user selects "Other" → use their custom input as path
 
 **Edge Cases:**
-- No changes found → "No OpenSpec changes found. Run `/openspec` first, then `/implement`."
-- No implemented changes → "No implemented changes found. Run `/implement` first."
+- No changes found → "No OpenSpec changes found. Run `/create-openspec` first, then `/implement-beads`."
+- No implemented changes → "No implemented changes found. Run `/implement-beads` first."
 
 ### Step 3: Read Spec Files
 
@@ -426,7 +426,7 @@ Implementation verified with warnings.
 Consider addressing P2/P3 issues before merge.
 
 To re-verify after fixes:
-  /architect:verify <SPEC_PATH>
+  /architect:verify-implementation <SPEC_PATH>
 ```
 
 If FAILED:
@@ -438,13 +438,13 @@ P1 Issues Remaining:
   - <id>: <title> (<file>)
 
 To re-verify after fixes:
-  /architect:verify <SPEC_PATH>
+  /architect:verify-implementation <SPEC_PATH>
 ```
 
 ## Workflow Diagram
 
 ```
-/architect:verify [spec-path]
+/architect:verify-implementation [spec-path]
     │
     ├─── [interactive] ─────────────────────────────────────────┐
     │    List available OpenSpec changes                        │
@@ -583,10 +583,10 @@ All agents return findings in this JSON structure:
 
 ```bash
 # Interactive mode (lists available changes)
-/architect:verify
+/architect:verify-implementation
 
 # Direct mode with specific spec
-/architect:verify openspec/changes/add-auth/
+/architect:verify-implementation openspec/changes/add-auth/
 
 # After verification completes successfully
 git add . && git commit -m "feat: add authentication"

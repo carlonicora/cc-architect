@@ -8,7 +8,7 @@ argument-hint: ""
 
 Gracefully stop any active implementation while preserving progress.
 
-**Works with:** `/implement` command (all modes: Swarm, Loop, Auto Loop)
+**Works with:** `/implement-beads` command (all modes: Swarm, Loop, Auto Loop)
 
 ## Instructions
 
@@ -56,7 +56,7 @@ To check current status:
   bd list --status in_progress    # Find current work
 
 To resume:
-  /implement
+  /implement-beads
 ```
 
 ## Data Preservation
@@ -65,7 +65,7 @@ To resume:
 - **In-progress tasks**: Remain in_progress (swarm workers may complete)
 - **Pending tasks**: Remain pending
 
-The beads database preserves all state. You can resume at any time with `/implement`.
+The beads database preserves all state. You can resume at any time with `/implement-beads`.
 
 ## Swarm vs Loop Cancellation
 
@@ -98,7 +98,7 @@ To check status:
   bd list
 
 To resume:
-  /implement
+  /implement-beads
 
 ===============================================================
 ```

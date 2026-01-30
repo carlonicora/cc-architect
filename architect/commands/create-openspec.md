@@ -30,7 +30,7 @@ If no input provided, prompts user to describe the change.
 openspec version 2>&1 | head -1
 
 # Check openspec is initialized
-ls openspec/project.md 2>/dev/null && echo "OpenSpec initialized" || echo "Not initialized"
+ls openspec/config.yaml 2>/dev/null && echo "OpenSpec initialized" || echo "Not initialized"
 
 # Check Vitest is configured (REQUIRED for test-driven development)
 ls vitest.config.ts vitest.config.js vitest.config.mts vitest.config.mjs 2>/dev/null | head -1 && echo "Vitest OK" || echo "WARNING: Vitest not configured"
@@ -180,8 +180,8 @@ NEXT STEPS
 ===============================================================
 
 1. Review: openspec show <change-id>
-2. Convert to beads: /beads openspec/changes/<change-id>/
-3. Or implement directly: /implement
+2. Convert to beads: /create-beads openspec/changes/<change-id>/
+3. Or implement directly: /implement-beads
 
 ===============================================================
 ```
@@ -189,7 +189,7 @@ NEXT STEPS
 ## Workflow Diagram
 
 ```
-/openspec [input]
+/create-openspec [input]
     │
     ▼
 ┌───────────────────────────────────────────────────────────────┐
@@ -229,7 +229,7 @@ NEXT STEPS
 │  │     • DO NOT SUMMARIZE - copy verbatim                  │  │
 │  │                                                         │  │
 │  │  2. EXPLORE CODEBASE                                    │  │
-│  │     • Read project.md, existing specs                   │  │
+│  │     • Read config.yaml, existing specs                  │  │
 │  │     • Search related code with rg/ls                    │  │
 │  │                                                         │  │
 │  │  3. CREATE PROPOSAL.MD                                  │  │
@@ -282,7 +282,7 @@ NEXT STEPS
 │  • Change ID, path, plan_reference                            │
 │  • Files created with plan content preserved                  │
 │  • Validation status                                          │
-│  • Next: /beads or /implement                                 │
+│  • Next: /create-beads or /implement-beads                                 │
 └───────────────────────────────────────────────────────────────┘
 
 ## Chain of Back-References
@@ -320,19 +320,19 @@ Plan (SOURCE OF TRUTH)
 
 ```bash
 # From architectural plan (explicit path)
-/openspec .claude/plans/auth-feature-3k7f2-plan.md
+/create-openspec .claude/plans/auth-feature-3k7f2-plan.md
 
 # From description
-/openspec Add OAuth2 authentication with Google login
+/create-openspec Add OAuth2 authentication with Google login
 
 # From current context (auto-detects plan in conversation)
-/openspec
+/create-openspec
 # → "Using plan: .claude/plans/auth-feature-3k7f2-plan.md"
 
 # Then continue with workflow
 openspec show add-oauth2-authentication
-/beads
-/implement
+/create-beads
+/implement-beads
 ```
 
 ## Input Mapping
@@ -396,11 +396,11 @@ Dependency Graph:
 Next Steps (choose one):
 
 Option A - Beads (recommended for multi-spec):
-  /beads
-  /implement
+  /create-beads
+  /implement-beads
 
 Option B - Sequential:
-  /implement (select each epic in order)
+  /implement-beads (select each epic in order)
 
 ===============================================================
 ```
@@ -417,7 +417,7 @@ Use AskUserQuestion with:
 - header: "Next step"
 - options:
   - label: "Continue (Recommended)"
-    description: "Proceed to /beads or /implement"
+    description: "Proceed to /create-beads or /implement-beads"
   - label: "Stop"
     description: "End here for manual review"
 ```
@@ -434,7 +434,7 @@ This command bridges the gap between planning and OpenSpec. Works with plans fro
 /code-quality-plan-creator     ┘
     │
     ▼
-/openspec <plan-path>    ← THIS COMMAND
+/create-openspec <plan-path>    ← THIS COMMAND
     │
     ├─── [small/medium] ────────▶ Single proposal
     │                                  │
@@ -444,5 +444,5 @@ This command bridges the gap between planning and OpenSpec. Works with plans fro
 openspec/changes/<id>/          openspec/changes/<id-1>/
     │                           openspec/changes/<id-2>/
     ▼                                  │
-/beads → /implement
+/create-beads → /implement-beads
 ```

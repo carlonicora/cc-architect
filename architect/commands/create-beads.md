@@ -101,8 +101,8 @@ Use AskUserQuestion with:
 - If user selects "Other" → use their custom input as path
 
 **Edge Cases:**
-- No changes found → "No OpenSpec changes found. Run `/openspec` first."
-- All in archive → "All changes archived. Run `/openspec` to create new."
+- No changes found → "No OpenSpec changes found. Run `/create-openspec` first."
+- All in archive → "All changes archived. Run `/create-openspec` to create new."
 
 ### Step 3: Parse and Validate Specs
 
@@ -208,7 +208,7 @@ Recommendation: PROCEED
 
 Next Steps:
 1. Review: bd list -l "openspec:<name>"
-2. Execute: /implement
+2. Execute: /implement-beads
    - Test beads run first (create test files)
    - Impl beads run after (implementation + test execution)
 
@@ -254,7 +254,7 @@ Recommendation: PROCEED
 
 Next Steps:
 1. Review: bd list
-2. Execute: /implement
+2. Execute: /implement-beads
    - Test beads run first (create test files)
    - Impl beads run after (implementation + test execution)
 
@@ -371,7 +371,7 @@ Total Beads Now: 9
 Ready: 4
 
 Next:
-- Execute: /implement
+- Execute: /implement-beads
 ===============================================================
 ```
 
@@ -394,9 +394,9 @@ Works with plans from **any planner**:
                                       openspec/changes/<id-3>/
     │                                       │
     ▼                                       ▼
-/beads (interactive)            /beads <spec-1> <spec-2> <spec-3>
+/create-beads (interactive)            /create-beads <spec-1> <spec-2> <spec-3>
     │                                       │
-    └──▶ /implement                         └──▶ /implement
+    └──▶ /implement-beads                         └──▶ /implement-beads
 ```
 
 ## Step Mode (Default)
@@ -411,12 +411,12 @@ Use AskUserQuestion with:
 - header: "Next step"
 - options:
   - label: "Implement (Recommended)"
-    description: "Proceed to /implement to execute beads"
+    description: "Proceed to /implement-beads to execute beads"
   - label: "Stop"
     description: "End here for manual review"
 ```
 
-Use `--auto` flag to skip pauses and proceed directly to /implement.
+Use `--auto` flag to skip pauses and proceed directly to /implement-beads.
 
 ## Git Policy
 
@@ -426,7 +426,7 @@ Use `--auto` flag to skip pauses and proceed directly to /implement.
 
 | Scenario | Action |
 |----------|--------|
-| bd not installed | "Install bd: https://github.com/steveyegge/beads" |
+| bd not installed | "Install bd: https://github.com/steveyegge/create-beads" |
 | bd not initialized | "Run: bd init" |
 | Path not found | Report error |
 
@@ -434,14 +434,14 @@ Use `--auto` flag to skip pauses and proceed directly to /implement.
 
 ```bash
 # Interactive mode (lists available changes)
-/beads
+/create-beads
 
 # Direct mode with single spec
-/beads openspec/changes/add-auth/
+/create-beads openspec/changes/add-auth/
 
 # Multiple decomposed specs
-/beads openspec/changes/add-auth-backend/ openspec/changes/add-auth-frontend/
+/create-beads openspec/changes/add-auth-backend/ openspec/changes/add-auth-frontend/
 
 # Auto mode (skip review pause)
-/beads openspec/changes/add-auth/ --auto
+/create-beads openspec/changes/add-auth/ --auto
 ```

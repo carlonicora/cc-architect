@@ -53,7 +53,7 @@ BEFORE writing ANY design code, you MUST:
 1. **Read the Architecture Index**: `docs/architecture/INDEX.md`
 2. **Follow the Quick Reference table** to identify which architecture docs apply to this task
 3. **Read only the relevant architecture docs** for the specific areas being changed
-4. Read `openspec/project.md` - Project context
+4. Read `openspec/config.yaml` - Project context
 5. Read `openspec/AGENTS.md` - OpenSpec conventions
 
 Example: If the proposal involves backend entities and frontend models, read:
@@ -81,7 +81,7 @@ cat docs/architecture/backend/01-entity-basics.md
 # ... read other relevant docs based on INDEX.md guidance
 
 # Read project context
-cat openspec/project.md
+cat openspec/config.yaml
 
 # Read OpenSpec conventions
 cat openspec/AGENTS.md 2>/dev/null || echo "No AGENTS.md found"
@@ -270,8 +270,8 @@ Dependency Graph:
   <name>-backend ──▶ <name>-frontend
 
 Recommended Execution Order:
-  1. /beads then /implement for <name>-backend
-  2. /beads then /implement for <name>-frontend
+  1. /create-beads then /implement-beads for <name>-backend
+  2. /create-beads then /implement-beads for <name>-frontend
 
 ===============================================================
 ```
@@ -1029,7 +1029,7 @@ STATUS: CREATED
 # SELF-VERIFICATION CHECKLIST
 
 **Phase 1 - Analysis:**
-- [ ] Read openspec/project.md for context
+- [ ] Read openspec/config.yaml for context
 - [ ] Parsed input (plan or description)
 - [ ] Extracted ALL sections from plan (including new format sections)
 - [ ] Explored related codebase

@@ -45,7 +45,7 @@ gaps, or misunderstandings BEFORE code is written.
 openspec version 2>&1 | head -1
 
 # Check openspec is initialized
-ls openspec/project.md 2>/dev/null && echo "OpenSpec initialized" || echo "Not initialized"
+ls openspec/config.yaml 2>/dev/null && echo "OpenSpec initialized" || echo "Not initialized"
 ```
 
 If not installed: "Install OpenSpec: https://github.com/Fission-AI/OpenSpec"
@@ -92,8 +92,8 @@ Use AskUserQuestion with:
 - If user selects "Other" → use their custom input as path
 
 **Edge Cases:**
-- No changes found → "No OpenSpec changes found. Run `/openspec` first."
-- All in archive → "All changes archived. Run `/openspec` to create new."
+- No changes found → "No OpenSpec changes found. Run `/create-openspec` first."
+- All in archive → "All changes archived. Run `/create-openspec` to create new."
 
 ### Step 3: Read and Parse All Spec Files
 
@@ -622,8 +622,8 @@ NEXT STEPS
 
 The OpenSpec has been validated and is ready for implementation.
 
-1. Convert to beads: /beads <SPEC_PATH>
-2. Then implement: /implement
+1. Convert to beads: /create-beads <SPEC_PATH>
+2. Then implement: /implement-beads
 
 ===============================================================
 ```
@@ -693,7 +693,7 @@ The OpenSpec has been validated and is ready for implementation.
 │                    COMPLETION                                 │
 │                                                               │
 │  Report: "Review complete"                                    │
-│  Suggest: "/beads <path>" → "/implement"                      │
+│  Suggest: "/create-beads <path>" → "/implement-beads"                      │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -743,7 +743,7 @@ When user selects "No, needs changes":
 |----------|--------|
 | OpenSpec not installed | "Install OpenSpec: https://github.com/Fission-AI/OpenSpec" |
 | OpenSpec not initialized | "Run: openspec init" |
-| No changes found | "No OpenSpec changes found. Run `/openspec` first." |
+| No changes found | "No OpenSpec changes found. Run `/create-openspec` first." |
 | Path not found | Report error, suggest correct path |
 | Spec file missing | Report which file is missing, cannot proceed |
 
@@ -757,6 +757,6 @@ When user selects "No, needs changes":
 /architect:review openspec/changes/add-auth/
 
 # After review completes
-/beads openspec/changes/add-auth/
-/implement
+/create-beads openspec/changes/add-auth/
+/implement-beads
 ```

@@ -102,7 +102,7 @@ Use AskUserQuestion with:
 
 **Edge Cases:**
 
-- No epics found → "No epics found. Run `/beads` to create beads from an OpenSpec change."
+- No epics found → "No epics found. Run `/create-beads` to create beads from an OpenSpec change."
 - No ready beads → "No ready beads. All beads may be completed or blocked."
 
 ### Step 4: Select Execution Mode (Interactive Mode)
@@ -464,37 +464,37 @@ bd show <id>                    # Full task details
 
 | Scenario               | Action                                                                         |
 | ---------------------- | ------------------------------------------------------------------------------ |
-| No epics found         | "No epics found. Run `/beads` to create beads from an OpenSpec change."        |
+| No epics found         | "No epics found. Run `/create-beads` to create beads from an OpenSpec change."        |
 | No ready beads         | "No ready beads. All beads may be completed or blocked."                       |
 | Vitest not configured  | "WARNING: Test validation will be skipped. Install: `npm install -D vitest`"   |
 | Tests fail (impl bead) | Mark bead as blocked, report failed tests, ask user (Loop) or continue (Swarm) |
 | Worker fails (swarm)   | Mark bead as blocked, report error, continue with others                       |
 | All beads blocked      | Stop, report blocking issues                                                   |
-| Max iterations reached | Loop stops automatically; resume with `/implement` to continue                 |
+| Max iterations reached | Loop stops automatically; resume with `/implement-beads` to continue                 |
 
 ## Stopping
 
 - Say "All beads complete" when done
-- Run `/cancel` to stop early
+- Run `/cancel-implementation` to stop early
 - In Loop mode: select "Stop" at the pause prompt
 
 ## Example Usage
 
 ```bash
 # Interactive mode (select epic and mode)
-/implement
+/implement-beads
 
 # With specific label (skip epic selection)
-/implement --label openspec:add-auth
+/implement-beads --label openspec:add-auth
 
 # With specific mode (skip mode selection)
-/implement --mode swarm
+/implement-beads --mode swarm
 
 # Full specification
-/implement --label openspec:add-auth --mode swarm --workers 5 --model opus
+/implement-beads --label openspec:add-auth --mode swarm --workers 5 --model opus
 
 # Auto loop mode
-/implement --label openspec:refactor --mode auto
+/implement-beads --label openspec:refactor --mode auto
 ```
 
 ## When to Use Loop vs Swarm

@@ -258,7 +258,7 @@ Before creating beads, assess complexity:
 
 | Task Complexity | Lines of Code | Bead Strategy |
 |-----------------|---------------|---------------|
-| Trivial | 1-20 lines | Single micro-bead OR skip beads, use `/implement-loop` |
+| Trivial | 1-20 lines | Single micro-bead OR skip beads, use `/implement-beads --mode loop` |
 | Small | 20-80 lines | Single bead with full code |
 | Medium | 80-200 lines | Single bead with full code (standard) |
 | Large | 200-400 lines | Split into 2-3 beads with explicit dependencies |
@@ -728,7 +728,7 @@ DEPENDENCY GRAPH (TDD):
   [TEST] test-utils ──▶ [IMPL] impl-utils ─┘
 
 Execution:
-  /implement --label openspec:<change-name>
+  /implement-beads --label openspec:<change-name>
   - Test beads run first (create test files)
   - Impl beads run after (implementation + test validation)
 
