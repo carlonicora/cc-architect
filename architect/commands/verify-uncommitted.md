@@ -237,7 +237,11 @@ Do NOT check:
 
 Track agent IDs for later collection.
 
+**CRITICAL: DO NOT EXIT after launching agents. You MUST proceed to Step 5 and wait for ALL agents to complete before continuing.**
+
 ### Step 5: Wait for All Agents
+
+**CRITICAL: You MUST wait for ALL agents to complete. DO NOT exit or end the conversation after spawning background tasks.**
 
 Use TaskOutput to wait for each agent:
 
@@ -256,6 +260,8 @@ For each agent_id:
 - If agent times out: report partial results, note timeout
 - If agent fails: report error, continue with others
 - If all agents fail: report environment issue, suggest fixes
+
+**DO NOT proceed to Step 6 until ALL agents have returned results. You MUST call TaskOutput for EACH agent and wait for completion.**
 
 ### Step 6: Consolidate and Sort Findings
 
