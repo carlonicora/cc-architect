@@ -532,6 +532,169 @@ Current problems:
 
 ---
 
+# PHASE 3.5: CREATE TESTS.MD (TDD)
+
+## Step 1: Check Vitest Configuration
+
+```bash
+# Vitest is REQUIRED for test generation
+if ls vitest.config.ts vitest.config.js vitest.config.mts vitest.config.mjs 2>/dev/null | head -1; then
+  echo "Vitest configured"
+else
+  echo "WARNING: Vitest not configured - tests.md will include setup instructions"
+fi
+```
+
+## Step 2: Create tests.md
+
+Create `openspec/changes/<change-id>/tests.md`:
+
+```markdown
+# <Change Title> - Tests
+
+## Plan Reference
+
+**Source Plan**: `<plan-path>`
+
+## Test Strategy
+
+**Framework**: Vitest
+**Location**: Co-located (src/foo.ts → src/foo.test.ts)
+**Derived From**: Given/When/Then scenarios in specs/*.md
+
+## Test Files
+
+### Test File: `<src/path/to/file.test.ts>`
+
+**Covers Requirement**: <Requirement Name from spec>
+**Covers Scenarios**: <List of scenario names>
+
+\`\`\`typescript
+import { describe, it, expect, vi } from 'vitest'
+import { functionUnderTest } from './file'
+
+// FULL test implementation - copy-paste ready
+
+describe('<Requirement Name>', () => {
+  describe('Scenario: <Scenario Name from spec>', () => {
+    it('should <expected behavior from THEN clause>', () => {
+      // GIVEN: <setup from scenario>
+      const input = <setup code>
+
+      // WHEN: <action from scenario>
+      const result = functionUnderTest(input)
+
+      // THEN: <assertion from scenario>
+      expect(result).<matcher>(<expected>)
+    })
+
+    it('should handle edge case: <edge case description>', () => {
+      // GIVEN: <edge case setup>
+      const input = <edge case input>
+
+      // WHEN: <action>
+      const result = functionUnderTest(input)
+
+      // THEN: <expected handling>
+      expect(result).<matcher>(<expected>)
+    })
+  })
+
+  describe('Scenario: <Edge Case Scenario from spec>', () => {
+    it('should <expected handling>', () => {
+      // Full test implementation for edge case scenario
+    })
+  })
+})
+\`\`\`
+
+### Test File: `<src/path/to/another.test.ts>`
+
+**Covers Requirement**: <Another Requirement>
+**Covers Scenarios**: <List of scenario names>
+
+\`\`\`typescript
+// Full test code for this file...
+\`\`\`
+
+## Test-to-Scenario Mapping
+
+| Scenario | Test File | Test Cases | Status |
+|----------|-----------|------------|--------|
+| <Scenario 1> | src/auth.test.ts | 2 cases | Ready |
+| <Scenario 2> | src/auth.test.ts | 3 cases | Ready |
+| <Scenario 3> | src/utils.test.ts | 1 case | Ready |
+
+## Run Commands
+
+\`\`\`bash
+# Run all tests for this change
+npx vitest run --reporter=verbose
+
+# Run specific test file
+npx vitest run <src/path/to/file.test.ts>
+
+# Watch mode during development
+npx vitest <src/path/to/file.test.ts>
+
+# Type-check tests
+npx vitest typecheck
+\`\`\`
+
+## Vitest Setup (if not configured)
+
+If Vitest is not yet configured in the project:
+
+\`\`\`bash
+# Install Vitest
+npm install -D vitest
+
+# Create vitest.config.ts
+cat > vitest.config.ts << 'EOF'
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'node',
+  },
+})
+EOF
+\`\`\`
+```
+
+## Step 3: Derive Tests from Scenarios
+
+For each scenario in specs/**/*.md:
+
+1. **Parse Given/When/Then:**
+   - GIVEN → Test setup (beforeEach, arrange, mock setup)
+   - WHEN → Action under test (function call, API request)
+   - THEN → Assertions (expect statements)
+
+2. **Generate 1:N test cases:**
+   - Main test case for the scenario (happy path)
+   - Edge case variants (null input, empty array, boundary values)
+   - Error cases if THEN describes error handling
+
+3. **Determine test file path (co-located):**
+   - Implementation: `src/services/auth.ts` → Test: `src/services/auth.test.ts`
+   - Implementation: `src/utils/validate.ts` → Test: `src/utils/validate.test.ts`
+
+4. **Generate FULL test code:**
+   - All imports (vitest, module under test, mocks)
+   - Complete describe/it blocks with clear structure
+   - Full assertions (not just `expect(result).toBeDefined()`)
+   - Mocks where external dependencies are used
+
+**Requirements:**
+- Each scenario MUST have at least 1 test case
+- Test file paths MUST be co-located with implementation
+- Tests MUST be copy-paste ready (full implementation, not scaffolds)
+- Test-to-scenario mapping table MUST be complete
+
+---
+
 # PHASE 4: CREATE TASKS.MD
 
 Create `openspec/changes/<change-id>/tasks.md`:
@@ -806,7 +969,10 @@ Before completing, verify these were preserved from the plan:
 - [ ] Migration Patterns in design.md have complete before/after
 - [ ] TypeScript interfaces are UNCHANGED from plan
 - [ ] ASCII diagrams are EXACT copies
-- [ ] plan_reference is in proposal.md, design.md, tasks.md
+- [ ] plan_reference is in proposal.md, design.md, tasks.md, tests.md
+- [ ] tests.md contains FULL test code derived from scenarios
+- [ ] Test file paths are co-located (src/foo.ts → src/foo.test.ts)
+- [ ] Test-to-scenario mapping table is complete
 
 ---
 
@@ -854,7 +1020,9 @@ STATUS: CREATED
 5. **plan_reference = ALWAYS** - Include in all files for recovery
 6. **Validate strictly** - Must pass `openspec validate --strict`
 7. **Scenarios required** - Every requirement needs at least 2 scenarios
-8. **Minimal output** - Return only structured result to orchestrator
+8. **Tests = FULL code** - tests.md contains complete Vitest test implementations
+9. **Tests = Co-located** - Test file paths match implementation (src/foo.ts → src/foo.test.ts)
+10. **Minimal output** - Return only structured result to orchestrator
 
 ---
 
@@ -897,6 +1065,15 @@ STATUS: CREATED
 - [ ] **Risk Analysis section populated** (Technical/Integration Risks)
 - [ ] **Rollback Strategy included** (with decision tree if present)
 - [ ] **Risk Assessment Summary included**
+
+**Phase 3.5 - Tests.md (TDD):**
+- [ ] Vitest configuration checked
+- [ ] Created tests.md with full test code
+- [ ] Each scenario has at least 1 test case
+- [ ] Test file paths are co-located (src/foo.ts → src/foo.test.ts)
+- [ ] Tests are copy-paste ready (full implementation, not scaffolds)
+- [ ] Test-to-scenario mapping table complete
+- [ ] Run commands included for test execution
 
 **Phase 4 - Tasks.md:**
 - [ ] plan_reference included
@@ -960,6 +1137,7 @@ openspec/changes/<change-id>/
 ├── proposal.md          # Overview, motivation, plan_reference
 ├── design.md            # Decisions, Reference Implementation, Migration Patterns
 ├── tasks.md             # Ordered steps, Exit Criteria (EXACT commands)
+├── tests.md             # Unit tests derived from scenarios (Vitest, co-located)
 └── specs/
     ├── <capability1>/
     │   └── spec.md      # Requirements with scenarios, plan_reference

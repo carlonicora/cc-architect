@@ -31,10 +31,14 @@ openspec version 2>&1 | head -1
 
 # Check openspec is initialized
 ls openspec/project.md 2>/dev/null && echo "OpenSpec initialized" || echo "Not initialized"
+
+# Check Vitest is configured (REQUIRED for test-driven development)
+ls vitest.config.ts vitest.config.js vitest.config.mts vitest.config.mjs 2>/dev/null | head -1 && echo "Vitest OK" || echo "WARNING: Vitest not configured"
 ```
 
 If not installed: "Install OpenSpec: https://github.com/Fission-AI/OpenSpec"
 If not initialized: "Run: openspec init"
+If Vitest not configured: "WARNING: Vitest is required for TDD workflow. Install with: `npm install -D vitest` and create `vitest.config.ts`"
 
 ### Step 2: Detect Input Type and Parse
 
@@ -108,7 +112,7 @@ When converting a plan, you MUST preserve:
 - **Plan Reference**: Path to source plan → ALL files (for recovery)
 - **Risk Analysis**: Technical/Integration risks → design.md, Rollback Strategy → design.md
 - **Stakeholders**: Primary/Secondary → proposal.md Impact section
-- **Testing Strategy**: Unit/Integration tests → tasks.md + specs scenarios
+- **Unit Tests**: Full Vitest test code → tests.md (derived from Given/When/Then scenarios)
 - **Success Metrics**: Functional criteria, quality metrics → tasks.md
 - **Post-Implementation Verification**: Automated checks, validation → tasks.md
 
@@ -120,9 +124,10 @@ When converting a plan, you MUST preserve:
 4. CREATE PROPOSAL - proposal.md with plan_reference, motivation, full scope tracking
 5. CREATE DESIGN - design.md with Reference Implementation (FULL code), Migration Patterns
 6. CREATE TASKS - tasks.md with Exit Criteria (EXACT commands from plan)
-7. CREATE SPECS - specs/*/spec.md with R1, R2, R3 → scenarios
-8. VALIDATE - openspec validate <change-id> --strict
-9. VERIFY - Check all plan content preserved
+7. CREATE TESTS - tests.md with full Vitest unit tests derived from scenarios
+8. CREATE SPECS - specs/*/spec.md with R1, R2, R3 → scenarios
+9. VALIDATE - openspec validate <change-id> --strict
+10. VERIFY - Check all plan content preserved
 
 Return:
 CHANGE_ID: <id>
@@ -152,6 +157,7 @@ Files Created:
   • proposal.md - Overview, motivation, plan_reference
   • design.md - Decisions, Reference Implementation, Migration Patterns
   • tasks.md - Implementation steps, Exit Criteria (exact commands)
+  • tests.md - Unit tests derived from scenarios (Vitest, co-located)
   • specs/<area>/spec.md - Requirements with scenarios
 
 Validation: PASSED
@@ -165,7 +171,7 @@ Plan Content Preserved:
   • Risk Analysis: Technical/Integration risks in design.md
   • Rollback Strategy: Decision tree in design.md
   • Stakeholders: Primary/Secondary in proposal.md Impact
-  • Testing Strategy: Unit/Integration tests in tasks.md + specs
+  • Testing Strategy: Unit tests in tests.md (Vitest, co-located)
   • Success Metrics: Functional/Quality/Acceptance in tasks.md
   • Post-Implementation: Verification steps in tasks.md
 
@@ -247,19 +253,24 @@ NEXT STEPS
 │  │     • plan_reference                                    │  │
 │  │     • Exit Criteria (EXACT commands from plan)          │  │
 │  │     • Manual verification steps                         │  │
-│  │     • Testing Strategy (Unit/Integration/Existing)      │  │
 │  │     • Success Metrics (Functional/Quality/Acceptance)   │  │
 │  │     • Post-Implementation Verification                  │  │
 │  │                                                         │  │
-│  │  6. CREATE SPECS/**/*.MD                                │  │
+│  │  6. CREATE TESTS.MD                                     │  │
+│  │     • Full Vitest unit tests from Given/When/Then       │  │
+│  │     • Co-located test file paths                        │  │
+│  │     • Test-to-scenario mapping table                    │  │
+│  │     • Run commands for test execution                   │  │
+│  │                                                         │  │
+│  │  7. CREATE SPECS/**/*.MD                                │  │
 │  │     • plan_reference                                    │  │
 │  │     • R1, R2, R3 → scenarios (2+ per requirement)       │  │
-│  │     • Test scenarios from Testing Strategy              │  │
+│  │     • Given/When/Then scenarios for test derivation     │  │
 │  │                                                         │  │
-│  │  7. VALIDATE                                            │  │
+│  │  8. VALIDATE                                            │  │
 │  │     • openspec validate <id> --strict                   │  │
 │  │     • Verify plan content preserved                     │  │
-│  │     • Verify new format sections extracted              │  │
+│  │     • Verify tests.md created with full test code       │  │
 │  └─────────────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────────────┘
     │
@@ -299,6 +310,7 @@ Plan (SOURCE OF TRUTH)
 | ------------------------ | ---------------------------------------------------------- |
 | OpenSpec not installed   | "Install OpenSpec: https://github.com/Fission-AI/OpenSpec" |
 | OpenSpec not initialized | "Run: openspec init"                                       |
+| Vitest not configured    | "WARNING: Install Vitest for TDD: `npm install -D vitest`" |
 | Plan file not found      | Report error, suggest correct path                         |
 | Empty input              | Ask user for description                                   |
 | Validation fails         | Report issues, agent attempts to fix                       |
@@ -339,7 +351,7 @@ How different inputs map to OpenSpec structure:
 | Exit Criteria        | tasks.md                | Verification steps                                           |
 | Risk Analysis        | design.md               | Technical/Integration risks, rollback strategy               |
 | Stakeholders         | proposal.md             | Impact section (primary/secondary)                           |
-| Testing Strategy     | tasks.md + specs        | Unit/Integration tests, existing tests to update             |
+| Testing Strategy     | tests.md                | Unit tests derived from scenarios (Vitest, co-located)       |
 | Success Metrics      | tasks.md                | Functional criteria, quality metrics, acceptance checklist   |
 | Post-Implementation  | tasks.md                | Automated checks, validation steps, stakeholder notification |
 

@@ -18,6 +18,14 @@ Execute beads using your choice of execution strategy.
 | **Loop** | Sequential with step-by-step confirmation | Interdependent tasks, debugging |
 | **Auto Loop** | Sequential without confirmation | Hands-off sequential execution |
 
+## TDD Execution Flow
+
+All modes follow the same TDD pattern:
+1. **Test beads execute first** (create test files, must compile)
+2. **Impl beads execute after** (implementation + test validation)
+3. **Tests run after each impl bead** (must pass to complete)
+4. **Blocked if tests fail** (in all modes)
+
 ## Arguments
 
 - `--label <label>`: Filter beads by label (e.g., `--label openspec:my-change`) - skips epic selection
@@ -36,6 +44,14 @@ bd version
 
 # Check initialized
 bd ready &>/dev/null && echo "OK" || echo "Run: bd init --stealth"
+
+# Check Vitest configured (REQUIRED for test validation)
+if ls vitest.config.ts vitest.config.js vitest.config.mts vitest.config.mjs 2>/dev/null | head -1; then
+  echo "Vitest OK"
+else
+  echo "WARNING: Vitest not configured - test validation will be skipped"
+  echo "Install: npm install -D vitest"
+fi
 ```
 
 ### Step 2: Parse Arguments
@@ -149,6 +165,7 @@ For each ready bead (up to `--workers` limit):
 
        Bead ID: <id>
        Title: <title>
+       Bead Type: <test | impl | non-testable>
 
        ## Task Description
        <full bead description from bd show>
@@ -157,8 +174,17 @@ For each ready bead (up to `--workers` limit):
        1. Read the files mentioned
        2. Make the required changes (use LSP tools for TypeScript: documentSymbol, findReferences, goToDefinition)
        3. Run verification commands in exit criteria
-       4. If this bead has an `openspec:` label: Edit `openspec/changes/<name>/tasks.md` to mark the corresponding task as `[x]`
-       5. Report success or failure
+
+       ## Test Validation (for impl beads only)
+       If this bead has label `type:impl`:
+       4. Find associated test file from bead description
+       5. Run tests: `npx vitest run <test-file-path> --reporter=verbose`
+       6. If tests FAIL: Output "BEAD BLOCKED: <id> - Tests failed: <summary>"
+       7. If tests PASS: Continue to completion
+
+       ## OpenSpec Update
+       8. If this bead has an `openspec:` label: Edit `openspec/changes/<name>/tasks.md` to mark the corresponding task as `[x]`
+       9. Report success or failure
 
        When complete, output: "BEAD COMPLETE: <id>"
        If blocked, output: "BEAD BLOCKED: <id> - <reason>"
@@ -230,7 +256,49 @@ Follow the task description:
 - `goToDefinition` - Navigate to symbol definition
 - `workspaceSymbol` - Search symbols across workspace
 
+### Loop Step 5.5: Run Tests (for implementation beads)
+
+**Skip if** bead has label `type:test` or `no-test:*` (test beads and non-testable beads don't run test validation)
+
+**For implementation beads (label `type:impl`):**
+
+1. **Find associated test file:**
+   - Parse bead description for "Test File:" path
+   - Or derive from implementation file: `src/foo.ts` → `src/foo.test.ts`
+
+2. **Run tests:**
+   ```bash
+   npx vitest run <test-file-path> --reporter=verbose
+   ```
+
+3. **Validate result:**
+   - Exit code 0 → Tests pass → Proceed to close bead
+   - Exit code != 0 → Tests fail → DO NOT close bead
+
+4. **If tests fail:**
+   - Report which tests failed
+   - Keep bead in `in_progress` status
+   - Ask user how to proceed (Loop mode)
+   - Mark as blocked (Auto Loop mode)
+
+### Test Failure Handling (Loop mode)
+
+```
+Use AskUserQuestion with:
+- question: "Tests failed for <bead-id>. What would you like to do?"
+- header: "Test Fail"
+- options:
+  - label: "Review and fix"
+    description: "Stay on this bead and fix the implementation"
+  - label: "Skip (mark blocked)"
+    description: "Mark bead as blocked and continue to next"
+  - label: "Stop"
+    description: "Stop the loop and review manually"
+```
+
 ### Loop Step 6: Complete the Task
+
+**Only proceed if tests pass (for impl beads) or bead is test/non-testable.**
 
 ```bash
 bd close <id> --reason "Done: <brief summary>"
@@ -309,9 +377,16 @@ Epic: <epic-title> (if specified)
 Label: <label>
 
 Results:
-  Completed: X beads
-  Blocked: Y beads (if any)
-  Remaining: Z beads
+  Test Beads: X completed (test files created)
+  Impl Beads: Y completed (tests passing)
+  Non-Testable: Z completed
+  Blocked: W beads (tests failed or other issues)
+  Remaining: R beads
+
+Test Summary:
+  Total Test Files: N
+  Tests Passing: P
+  Tests Failing: F
 
 ===============================================================
 ```
@@ -344,6 +419,8 @@ bd show <id>                    # Full task details
 |----------|--------|
 | No epics found | "No epics found. Run `/beads` to create beads from an OpenSpec change." |
 | No ready beads | "No ready beads. All beads may be completed or blocked." |
+| Vitest not configured | "WARNING: Test validation will be skipped. Install: `npm install -D vitest`" |
+| Tests fail (impl bead) | Mark bead as blocked, report failed tests, ask user (Loop) or continue (Swarm) |
 | Worker fails (swarm) | Mark bead as blocked, report error, continue with others |
 | All beads blocked | Stop, report blocking issues |
 | Max iterations reached | Loop stops automatically; resume with `/implement` to continue |
@@ -383,3 +460,5 @@ bd show <id>                    # Full task details
 | Want maximum speed | Swarm |
 | Debugging issues | Loop |
 | Large refactoring with phases | Swarm |
+| Want to fix test failures interactively | Loop |
+| Tests are stable and expected to pass | Swarm or Auto Loop |

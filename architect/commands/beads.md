@@ -36,6 +36,11 @@ Key advantages:
    - Build verification steps
    - Acceptance criteria checkboxes
 
+4. **TDD Structure** (for testable tasks)
+   - Test beads (type:test) - create test files first
+   - Impl beads (type:impl) - depend on test beads
+   - Non-testable beads (no-test:*) - auto-detected config/type changes
+
 ## Arguments
 
 - **No argument**: Interactive mode - lists available OpenSpec changes and asks which to convert
@@ -177,8 +182,13 @@ BEADS CREATED
 ===============================================================
 
 Epic: <id>
-Tasks: <count>
+Tasks: <count> (test: N, impl: M, non-testable: P)
 Ready: <count>
+
+TDD Structure:
+  Test Beads: N (create first, must compile)
+  Impl Beads: M (depend on test beads, must pass tests)
+  Non-Testable: P (no test requirement)
 
 Complexity Assessment: <trivial|small|medium|large|huge>
 Decomposition Strategy: <single-bead|multi-bead|hierarchical>
@@ -187,6 +197,9 @@ Decomposition Strategy: <single-bead|multi-bead|hierarchical>
 | Metric | Value | Status |
 |--------|-------|--------|
 | Total beads | N | OK |
+| Test beads | N | OK |
+| Impl beads | N | OK |
+| Test coverage | 100% | OK |
 | Avg lines | N | OK |
 | Independence | N% | OK |
 | Max chain | N | OK |
@@ -196,6 +209,8 @@ Recommendation: PROCEED
 Next Steps:
 1. Review: bd list -l "openspec:<name>"
 2. Execute: /implement
+   - Test beads run first (create test files)
+   - Impl beads run after (implementation + test execution)
 
 ===============================================================
 ```
@@ -208,23 +223,29 @@ BEADS CREATED (FROM DECOMPOSED PROPOSALS)
 
 Specs Processed: N
 
-| Spec | Epic ID | Tasks | Ready |
-|------|---------|-------|-------|
-| add-auth-backend | epic-001 | 5 | 5 |
-| add-auth-frontend | epic-002 | 4 | 0 |
-| add-auth-tests | epic-003 | 3 | 0 |
+| Spec | Epic ID | Test Beads | Impl Beads | Ready |
+|------|---------|------------|------------|-------|
+| add-auth-backend | epic-001 | 3 | 2 | 3 |
+| add-auth-frontend | epic-002 | 2 | 2 | 0 |
+| add-auth-integration | epic-003 | 1 | 2 | 0 |
 
 Cross-Spec Dependencies:
   epic-001 (add-auth-backend) → blocks → epic-002 (add-auth-frontend)
-  epic-002 (add-auth-frontend) → blocks → epic-003 (add-auth-tests)
+  epic-002 (add-auth-frontend) → blocks → epic-003 (add-auth-integration)
 
-Total Beads: 12
-Ready Now: 5 (from add-auth-backend)
+TDD Structure:
+  Total Test Beads: 6 (create first, must compile)
+  Total Impl Beads: 6 (depend on test beads, must pass tests)
+  Total Beads: 12
+  Ready Now: 3 (test beads from add-auth-backend)
 
 ## Quality Report
 | Metric | Value | Status |
 |--------|-------|--------|
 | Total beads | 12 | OK |
+| Test beads | 6 | OK |
+| Impl beads | 6 | OK |
+| Test coverage | 100% | OK |
 | Avg lines | 85 | OK |
 | Independence | 65% | OK |
 | Max chain | 3 | OK |
@@ -234,6 +255,8 @@ Recommendation: PROCEED
 Next Steps:
 1. Review: bd list
 2. Execute: /implement
+   - Test beads run first (create test files)
+   - Impl beads run after (implementation + test execution)
 
 ===============================================================
 ```
@@ -247,16 +270,41 @@ Each bead must be implementable with ONLY its description. Include **dual back-r
 bd create "Update auth" -t task
 ```
 
-**GOOD:**
+**GOOD - Test Bead (TDD):**
+```
+bd create "Test: Add JWT validation" -t task -p 2 \
+  --parent <epic-id> \
+  -l "openspec:add-auth" \
+  -l "type:test" \
+  -d "## Test Bead
+
+**Validation**: Complete when test file exists and compiles.
+
+## Test File to Create
+**Path**: src/auth.test.ts
+
+## Full Test Code
+\`\`\`typescript
+import { describe, it, expect } from 'vitest'
+// FULL test code here - copy-paste ready
+\`\`\`
+
+## Exit Criteria
+- [ ] Test file created
+- [ ] \`npx vitest typecheck\` passes"
+```
+
+**GOOD - Impl Bead (depends on test):**
 ```
 bd create "Add JWT validation" -t task -p 2 \
   --parent <epic-id> \
   -l "openspec:add-auth" \
+  -l "type:impl" \
   -d "## Context Chain
 
 **Spec Reference**: openspec/changes/add-auth/specs/auth/spec.md
-**Plan Reference**: .claude/plans/auth-3k7f2-plan.md
-**Task**: 1.2 from tasks.md
+**Test Bead ID**: <test-bead-id>
+**Test File**: src/auth.test.ts
 
 ## Requirements
 <copied from spec - FULL text>
@@ -265,7 +313,7 @@ bd create "Add JWT validation" -t task -p 2 \
 <FULL code from design.md>
 
 ## Exit Criteria
-- [ ] \`npm test -- auth\` passes
+- [ ] \`npx vitest run src/auth.test.ts\` passes
 - [ ] TypeScript compiles
 
 ## Files
