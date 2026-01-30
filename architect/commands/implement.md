@@ -1,7 +1,8 @@
 ---
 description: "Execute beads using loop (sequential) or swarm (parallel) mode"
 argument-hint: "[--label <label>] [--epic <id>] [--mode <swarm|loop|auto>]"
-allowed-tools: ["Task", "TaskOutput", "Read", "TodoWrite", "Bash", "Edit", "AskUserQuestion"]
+allowed-tools:
+  ["Task", "TaskOutput", "Read", "TodoWrite", "Bash", "Edit", "AskUserQuestion"]
 ---
 
 # Implement Command
@@ -12,15 +13,16 @@ Execute beads using your choice of execution strategy.
 
 ## Execution Modes
 
-| Mode | Description | Best For |
-|------|-------------|----------|
-| **Swarm** | Parallel workers | Independent beads, maximum speed |
-| **Loop** | Sequential with step-by-step confirmation | Interdependent tasks, debugging |
-| **Auto Loop** | Sequential without confirmation | Hands-off sequential execution |
+| Mode          | Description                               | Best For                         |
+| ------------- | ----------------------------------------- | -------------------------------- |
+| **Swarm**     | Parallel workers                          | Independent beads, maximum speed |
+| **Loop**      | Sequential with step-by-step confirmation | Interdependent tasks, debugging  |
+| **Auto Loop** | Sequential without confirmation           | Hands-off sequential execution   |
 
 ## TDD Execution Flow
 
 All modes follow the same TDD pattern:
+
 1. **Test beads execute first** (create test files, must compile)
 2. **Impl beads execute after** (implementation + test validation)
 3. **Tests run after each impl bead** (must pass to complete)
@@ -31,7 +33,7 @@ All modes follow the same TDD pattern:
 - `--label <label>`: Filter beads by label (e.g., `--label openspec:my-change`) - skips epic selection
 - `--epic <id>`: Execute beads for a specific epic - skips epic selection
 - `--mode <swarm|loop|auto>`: Skip mode selection prompt
-- `--workers N`: Maximum concurrent workers for swarm mode (default: 3)
+- `--workers N`: Maximum concurrent workers for swarm mode (default: 5)
 - `--model MODEL`: Worker model for swarm - `haiku`, `sonnet`, or `opus` (default: opus)
 
 ## Instructions
@@ -57,10 +59,11 @@ fi
 ### Step 2: Parse Arguments
 
 Parse `$ARGUMENTS` for flags:
+
 - `--label <value>` → skip epic selection, use this label
 - `--epic <id>` → skip epic selection, use this epic
 - `--mode <swarm|loop|auto>` → skip mode selection
-- `--workers <N>` (default: 3)
+- `--workers <N>` (default: 5)
 - `--model <MODEL>` (default: opus)
 
 ### Step 3: Select Epic (Interactive Mode)
@@ -79,6 +82,7 @@ bd list -t epic --json 2>/dev/null | jq -r '
 **Present Available Epics:**
 
 Use AskUserQuestion:
+
 ```
 Use AskUserQuestion with:
 - question: "Select an epic to implement:"
@@ -92,10 +96,12 @@ Use AskUserQuestion with:
 ```
 
 **Handle Selection:**
+
 - If user selects an epic → extract the `openspec:<name>` label for filtering
 - If user selects "Other" → use their custom input (label or epic ID)
 
 **Edge Cases:**
+
 - No epics found → "No epics found. Run `/beads` to create beads from an OpenSpec change."
 - No ready beads → "No ready beads. All beads may be completed or blocked."
 
@@ -104,6 +110,7 @@ Use AskUserQuestion with:
 **Skip if** `--mode` provided.
 
 Use AskUserQuestion:
+
 ```
 Use AskUserQuestion with:
 - question: "Select execution mode:"
@@ -136,12 +143,14 @@ Parse the JSON to build a task graph with dependencies.
 ### Swarm Step 2: Build Dependency Graph
 
 From the beads JSON, extract:
+
 - `id`: Bead identifier
 - `title` or `description`: Task name
 - `depends_on`: Array of blocking bead IDs
 - `status`: pending, in_progress, completed
 
 **A bead is "ready" when:**
+
 - Status is `pending`
 - All beads in `depends_on` have status `completed`
 
@@ -150,11 +159,13 @@ From the beads JSON, extract:
 For each ready bead (up to `--workers` limit):
 
 1. Mark bead as in_progress:
+
    ```bash
    bd update <id> --status in_progress
    ```
 
 2. Launch worker agent using Task tool:
+
    ```
    Use Task tool with:
    - subagent_type: "general-purpose"
@@ -192,24 +203,52 @@ For each ready bead (up to `--workers` limit):
 
 3. Track worker assignment: `worker_id → bead_id`
 
-### Swarm Step 4: Monitor Completion
+### Swarm Step 4: Monitor and Manage Workers (CRITICAL LOOP)
 
-Wait for workers to complete using TaskOutput:
+**CRITICAL: You MUST stay in this monitoring loop until ALL beads are complete or blocked. DO NOT exit after spawning workers.**
 
-1. Poll each running worker with `TaskOutput(task_id, block=false)`
-2. When worker completes:
-   - Parse output for "BEAD COMPLETE" or "BEAD BLOCKED"
-   - If complete: `bd close <id> --reason "Done"`
-   - If blocked: Report issue, mark as blocked
-3. Update dependency graph (remove completed from blockedBy lists)
-4. Identify newly unblocked beads
-5. Spawn replacement workers for new ready beads
+```
+WHILE (pending_beads > 0 OR active_workers > 0):
 
-### Swarm Step 5: Continue Until Done
+    1. WAIT for any worker to complete:
+       - Call TaskOutput(task_id, block=true, timeout=60000) for each active worker
+       - This blocks until a worker finishes or times out
 
-Repeat until:
-- All beads are completed, OR
-- No more work can be done (all remaining are blocked)
+    2. WHEN a worker completes:
+       - Parse output for "BEAD COMPLETE: <id>" or "BEAD BLOCKED: <id>"
+       - If COMPLETE:
+         - Run: bd close <id> --reason "Done"
+         - Remove from active_workers
+       - If BLOCKED:
+         - Run: bd update <id> --status blocked
+         - Report the blocking reason
+         - Remove from active_workers
+
+    3. UPDATE dependency graph:
+       - Refresh ready beads: bd ready -l "<label>" --json
+       - Identify newly unblocked beads (dependencies now satisfied)
+
+    4. SPAWN replacement workers:
+       - For each newly ready bead (up to --workers limit):
+         - Mark as in_progress
+         - Launch worker agent (same as Swarm Step 3)
+         - Add to active_workers
+
+    5. REPORT progress:
+       - Show: "Progress: X/Y beads complete, Z active workers, W blocked"
+
+    6. CONTINUE the loop (go back to step 1)
+
+END WHILE
+```
+
+**Exit conditions (ONLY exit when one of these is true):**
+
+- All beads have status `completed` → Success
+- All remaining beads are `blocked` with no active workers → Blocked state
+- No more ready beads AND no active workers → Done
+
+**DO NOT exit just because you spawned workers. You MUST wait for them to finish and spawn new workers for unblocked beads.**
 
 ---
 
@@ -246,11 +285,13 @@ bd update <id> --status in_progress
 ### Loop Step 5: Implement the Task
 
 Follow the task description:
+
 1. Read the files mentioned
 2. Make the required changes
 3. Run any tests/verification in acceptance criteria
 
 **TypeScript LSP (when available):** For TypeScript/JavaScript code, use LSP tools for better accuracy:
+
 - `documentSymbol` - Find symbols in a file
 - `findReferences` - Find all usages of a symbol
 - `goToDefinition` - Navigate to symbol definition
@@ -267,6 +308,7 @@ Follow the task description:
    - Or derive from implementation file: `src/foo.ts` → `src/foo.test.ts`
 
 2. **Run tests:**
+
    ```bash
    npx vitest run <test-file-path> --reporter=verbose
    ```
@@ -312,9 +354,11 @@ Edit `openspec/changes/<name>/tasks.md` to mark that task complete:
 
 ```markdown
 # Before
+
 - [ ] Task description here
 
 # After
+
 - [x] Task description here
 ```
 
@@ -325,6 +369,7 @@ Edit `openspec/changes/<name>/tasks.md` to mark that task complete:
 **In Auto Loop mode:** Continue to next ready bead immediately.
 
 **Before pausing, output execution status:**
+
 ```
 ===============================================================
 BEAD COMPLETED: <bead-id>
@@ -355,6 +400,7 @@ Use AskUserQuestion with:
 ```
 
 Based on the response:
+
 - **Continue**: Proceed to next in execution order
 - **Stop**: End the loop and report progress
 - **Specific bead ID**: Work on that bead next
@@ -394,6 +440,7 @@ Test Summary:
 ## Progress Visualization
 
 Press `ctrl+t` at any time to see:
+
 - Number of active workers (swarm)
 - Tasks in progress
 - Completed tasks
@@ -415,15 +462,15 @@ bd show <id>                    # Full task details
 
 ## Error Handling
 
-| Scenario | Action |
-|----------|--------|
-| No epics found | "No epics found. Run `/beads` to create beads from an OpenSpec change." |
-| No ready beads | "No ready beads. All beads may be completed or blocked." |
-| Vitest not configured | "WARNING: Test validation will be skipped. Install: `npm install -D vitest`" |
+| Scenario               | Action                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------ |
+| No epics found         | "No epics found. Run `/beads` to create beads from an OpenSpec change."        |
+| No ready beads         | "No ready beads. All beads may be completed or blocked."                       |
+| Vitest not configured  | "WARNING: Test validation will be skipped. Install: `npm install -D vitest`"   |
 | Tests fail (impl bead) | Mark bead as blocked, report failed tests, ask user (Loop) or continue (Swarm) |
-| Worker fails (swarm) | Mark bead as blocked, report error, continue with others |
-| All beads blocked | Stop, report blocking issues |
-| Max iterations reached | Loop stops automatically; resume with `/implement` to continue |
+| Worker fails (swarm)   | Mark bead as blocked, report error, continue with others                       |
+| All beads blocked      | Stop, report blocking issues                                                   |
+| Max iterations reached | Loop stops automatically; resume with `/implement` to continue                 |
 
 ## Stopping
 
@@ -452,13 +499,13 @@ bd show <id>                    # Full task details
 
 ## When to Use Loop vs Swarm
 
-| Situation | Use |
-|-----------|-----|
-| Tasks depend heavily on each other | Loop or Auto Loop |
-| Want to review each step | Loop |
-| Many independent tasks | Swarm |
-| Want maximum speed | Swarm |
-| Debugging issues | Loop |
-| Large refactoring with phases | Swarm |
-| Want to fix test failures interactively | Loop |
-| Tests are stable and expected to pass | Swarm or Auto Loop |
+| Situation                               | Use                |
+| --------------------------------------- | ------------------ |
+| Tasks depend heavily on each other      | Loop or Auto Loop  |
+| Want to review each step                | Loop               |
+| Many independent tasks                  | Swarm              |
+| Want maximum speed                      | Swarm              |
+| Debugging issues                        | Loop               |
+| Large refactoring with phases           | Swarm              |
+| Want to fix test failures interactively | Loop               |
+| Tests are stable and expected to pass   | Swarm or Auto Loop |
