@@ -32,7 +32,7 @@ All modes follow the same TDD pattern:
 
 - `--label <label>`: Filter beads by label (e.g., `--label openspec:my-change`) - skips epic selection
 - `--epic <id>`: Execute beads for a specific epic - skips epic selection
-- `--mode <swarm|loop|auto>`: Skip mode selection prompt
+- `--mode <swarm|loop|auto>`: Execution mode (default: swarm)
 - `--workers N`: Maximum concurrent workers for swarm mode (default: 5)
 - `--model MODEL`: Worker model for swarm - `haiku`, `sonnet`, or `opus` (default: opus)
 
@@ -105,24 +105,13 @@ Use AskUserQuestion with:
 - No epics found → "No epics found. Run `/create-beads` to create beads from an OpenSpec change."
 - No ready beads → "No ready beads. All beads may be completed or blocked."
 
-### Step 4: Select Execution Mode (Interactive Mode)
+### Step 4: Determine Execution Mode
 
-**Skip if** `--mode` provided.
+**Default: Swarm mode** (parallel workers for maximum speed).
 
-Use AskUserQuestion:
-
-```
-Use AskUserQuestion with:
-- question: "Select execution mode:"
-- header: "Mode"
-- options:
-  - label: "Swarm (Recommended)"
-    description: "Parallel workers - maximum speed, up to N concurrent tasks"
-  - label: "Loop"
-    description: "Sequential - pause after each bead for review"
-  - label: "Auto Loop"
-    description: "Sequential - no pauses, runs until complete"
-```
+- If `--mode loop` → use Loop mode (sequential with confirmation)
+- If `--mode auto` → use Auto Loop mode (sequential without confirmation)
+- If no `--mode` provided → use Swarm mode (default)
 
 ### Step 5: Execute Based on Mode
 
@@ -481,20 +470,20 @@ bd show <id>                    # Full task details
 ## Example Usage
 
 ```bash
-# Interactive mode (select epic and mode)
+# Default swarm mode (select epic interactively)
 /implement-beads
 
-# With specific label (skip epic selection)
+# With specific label (skip epic selection, default swarm)
 /implement-beads --label openspec:add-auth
 
-# With specific mode (skip mode selection)
-/implement-beads --mode swarm
+# Sequential with confirmation prompts
+/implement-beads --mode loop
+
+# Sequential without confirmation (hands-off)
+/implement-beads --mode auto
 
 # Full specification
 /implement-beads --label openspec:add-auth --mode swarm --workers 5 --model opus
-
-# Auto loop mode
-/implement-beads --label openspec:refactor --mode auto
 ```
 
 ## When to Use Loop vs Swarm
