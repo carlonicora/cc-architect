@@ -7,9 +7,7 @@ allowed-tools:
 
 # Implement Command
 
-Execute beads using your choice of execution strategy.
-
-**IMPORTANT**: This command combines loop (sequential) and swarm (parallel) execution modes with interactive selection.
+Execute beads in parallel (swarm mode by default) or sequentially (loop mode with --mode flag).
 
 ## Execution Modes
 
@@ -62,7 +60,7 @@ Parse `$ARGUMENTS` for flags:
 
 - `--label <value>` → skip epic selection, use this label
 - `--epic <id>` → skip epic selection, use this epic
-- `--mode <swarm|loop|auto>` → skip mode selection
+- `--mode <swarm|loop|auto>` → override default (swarm)
 - `--workers <N>` (default: 5)
 - `--model <MODEL>` (default: opus)
 
@@ -114,6 +112,8 @@ Use AskUserQuestion with:
 - If no `--mode` provided → use Swarm mode (default)
 
 ### Step 5: Execute Based on Mode
+
+**CRITICAL FOR SWARM MODE: After spawning workers, you MUST enter the monitoring loop and wait for ALL workers to complete. DO NOT return control to the user after spawning. Stay in the loop until all beads are done or blocked.**
 
 ---
 
@@ -192,6 +192,8 @@ For each ready bead (up to `--workers` limit):
 
 3. Track worker assignment: `worker_id → bead_id`
 
+**IMPORTANT: After spawning these initial workers, IMMEDIATELY proceed to Swarm Step 4 (Monitor and Manage Workers). DO NOT stop or return to the user.**
+
 ### Swarm Step 4: Monitor and Manage Workers (CRITICAL LOOP)
 
 **CRITICAL: You MUST stay in this monitoring loop until ALL beads are complete or blocked. DO NOT exit after spawning workers.**
@@ -238,6 +240,8 @@ END WHILE
 - No more ready beads AND no active workers → Done
 
 **DO NOT exit just because you spawned workers. You MUST wait for them to finish and spawn new workers for unblocked beads.**
+
+**WARNING: If you exit this command before all beads are complete or blocked, the implementation will be incomplete. The user explicitly expects you to wait for all workers and spawn replacements until done.**
 
 ---
 
