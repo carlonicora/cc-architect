@@ -303,6 +303,8 @@ By Agent:
 
 **If no findings**: Skip to Step 9 (Final Report) with PASSED status.
 
+**If findings exist**: Proceed IMMEDIATELY to Step 8. Do NOT ask the user if they want to fix all findings at once. Do NOT present a batch fix option. Show findings ONE AT A TIME.
+
 ### Step 8: Interactive Fix Loop
 
 Process findings in severity order: P1 first, then P2, then P3.
@@ -346,30 +348,87 @@ Use AskUserQuestion with:
 - options:
   - label: "Apply Fix"
     description: "Apply the proposed fix to <finding.location.file>"
+  - label: "Apply with changes"
+    description: "Provide custom instructions before applying"
   - label: "Skip"
     description: "Skip this fix, continue to next issue"
   - label: "Stop"
     description: "Stop fixing, show remaining issues"
 ```
 
-**If "Apply Fix":**
-1. Apply the fix using Edit tool at specified location
-2. Re-run relevant verification:
-   - For type errors: `npx tsc --noEmit <file>`
-   - For lint errors: `npx eslint <file>`
-   - For test failures: `npx vitest run <test-file>`
-3. Report result:
+**If "Apply with changes":**
+1. Use AskUserQuestion to get user's modification instructions:
    ```
-   Fixed <finding.id>: <finding.title>
+   Use AskUserQuestion with:
+   - question: "What changes or additions do you want to make to the proposed fix?"
+   - header: "Modify Fix"
+   - options:
+     - label: "Add logging"
+       description: "Add console.log or logger statements"
+     - label: "Add error handling"
+       description: "Wrap in try-catch or add validation"
+     - label: "Different approach"
+       description: "Describe your preferred solution"
+   ```
+2. Capture user's selection/input as `USER_MODIFICATIONS`
+3. Continue to fix agent delegation below
 
-   Verification: PASSED | FAILED
+**If "Apply Fix" or "Apply with changes":**
+
+Delegate to fix-finding agent:
+
+```
+Use Task tool with:
+- subagent_type: "architect:fix-finding"
+- model: opus
+- run_in_background: false  # Wait for result
+- prompt: |
+    Apply fix for verification finding.
+
+    ## Finding Details
+    - ID: <finding.id>
+    - Severity: <finding.severity>
+    - Category: <finding.category>
+    - File: <finding.location.file>
+    - Line: <finding.location.line>
+
+    ## Problem
+    <finding.description>
+
+    ## Expected
+    <finding.expected>
+
+    ## Actual
+    <finding.actual>
+
+    ## Proposed Fix
+    <finding.proposed_fix>
+
+    ## Fix Code
+    ```<language>
+    <finding.fix_code>
+    ```
+
+    ## User Modifications (if any)
+    <USER_MODIFICATIONS or "None - apply proposed fix as-is">
+
+    Apply the fix and run verification. Return JSON result.
+```
+
+Wait for agent completion, then parse the JSON result:
+
+1. If status == "SUCCESS":
+   ```
+   ✓ Fixed <finding.id>: <finding.title>
+
+   Verification: PASSED
 
    Continuing to next finding...
    ```
-4. If verification fails after fix:
+2. If status == "FAILED" or status == "PARTIAL":
    ```
    Use AskUserQuestion with:
-   - question: "Fix applied but verification still fails. What to do?"
+   - question: "Fix applied but verification failed: <verification_output>. What to do?"
    - header: "Fix Failed"
    - options:
      - label: "Keep fix anyway"
@@ -379,7 +438,7 @@ Use AskUserQuestion with:
      - label: "Stop"
        description: "Stop fixing to investigate"
    ```
-5. Continue to next finding
+3. Continue to next finding
 
 **If "Skip":**
 - Mark finding as skipped
@@ -391,7 +450,7 @@ Use AskUserQuestion with:
 
 **For P2 findings:**
 
-Same process as P1, but add option:
+Same process as P1 (including agent delegation), but with these options:
 ```
 Use AskUserQuestion with:
 - question: "Apply fix for <finding.id>: <finding.title>?"
@@ -399,10 +458,10 @@ Use AskUserQuestion with:
 - options:
   - label: "Apply Fix"
     description: "Apply the proposed fix"
+  - label: "Apply with changes"
+    description: "Provide custom instructions before applying"
   - label: "Skip"
     description: "Skip this fix"
-  - label: "Stop"
-    description: "Stop fixing"
   - label: "Skip All P2/P3"
     description: "Skip remaining P2 and all P3 findings"
 ```
