@@ -1,6 +1,6 @@
 ---
 description: "Run Playwright E2E tests derived from OpenSpec scenarios using parallel workers"
-argument-hint: "[--headed] [--browsers chromium,firefox,webkit]"
+argument-hint: "[spec-path] [--headed] [--browsers chromium,firefox,webkit]"
 allowed-tools: ["Task", "TaskOutput", "Bash", "Read", "Write", "Glob", "Grep", "AskUserQuestion"]
 ---
 
@@ -20,10 +20,27 @@ This command:
 
 ## Arguments
 
-| Flag | Default | Description |
-|------|---------|-------------|
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `[spec-path]` | (interactive) | Optional path to OpenSpec directory (active or archived) |
 | `--headed` | false | Run browsers in visible mode |
 | `--browsers` | chromium | Comma-separated: chromium,firefox,webkit |
+
+### Examples
+
+```bash
+# Interactive selection from active OpenSpecs
+/run-e2e
+
+# Explicit path to active spec
+/run-e2e openspec/changes/change-001
+
+# Explicit path to archived spec
+/run-e2e openspec/changes/archive/change-001
+
+# With options
+/run-e2e openspec/changes/archive/change-001 --headed --browsers chromium,firefox
+```
 
 ## Instructions
 
@@ -134,10 +151,34 @@ To update the URL, edit: playwright.config.md
 
 ### Step 5: Select OpenSpec Change
 
+**If spec-path argument was provided:**
+
+Validate the provided path:
+
+```bash
+# Check directory exists
+test -d "<spec-path>" && echo "EXISTS" || echo "NOT_FOUND"
+
+# Check specs subdirectory exists
+test -d "<spec-path>/specs" && echo "HAS_SPECS" || echo "NO_SPECS"
+
+# Check for spec files
+find "<spec-path>/specs" -name "*.md" -type f 2>/dev/null | head -1
+```
+
+If validation fails:
+- Directory doesn't exist → Show error: "OpenSpec path not found: `<spec-path>`"
+- No specs/ subdirectory → Show error: "No specs/ directory in `<spec-path>`"
+- No .md files in specs/ → Show error: "No spec files found in `<spec-path>/specs`"
+
+If valid, use the provided path and skip interactive selection.
+
+**If no spec-path argument (interactive mode):**
+
 List available OpenSpec changes:
 
 ```bash
-ls -d .openspec/*/
+ls -d openspec/changes/*/ 2>/dev/null | grep -v '/archive/'
 ```
 
 Present interactive selection:
@@ -173,10 +214,10 @@ What would you like to do?
 
 ### Step 7: Parse OpenSpec Scenarios
 
-Read all spec files from the selected change:
+Read all spec files from the selected change (using the path from Step 5):
 
 ```bash
-find .openspec/<change-id>/specs -name "*.md" -type f
+find "<spec-path>/specs" -name "*.md" -type f
 ```
 
 For each spec file, extract Given/When/Then scenarios:
@@ -494,7 +535,9 @@ Include failure details in bead description.
 |-------|--------|
 | Playwright not installed | Offer to install |
 | URL not reachable | BLOCK with clear message |
-| No OpenSpec changes | Show: "No OpenSpec changes found. Run /architect:create-openspec first" |
+| Spec-path not found | Show: "OpenSpec path not found: `<path>`" |
+| Spec-path has no specs/ | Show: "No specs/ directory in `<path>`" |
+| No OpenSpec changes (interactive) | Show: "No OpenSpec changes found. Run /architect:create-openspec first" |
 | No specs/*.md files | Show: "No scenarios found in specs/ directory" |
 | Auth fails | Show error, suggest checking credentials/selectors |
 | Worker timeout | Mark as failed, continue with others |
@@ -526,7 +569,7 @@ project/
 ## Example Usage
 
 ```bash
-# Run with defaults (headless chromium)
+# Run with defaults (headless chromium, interactive selection)
 /architect:run-e2e
 
 # Run with visible browser
@@ -537,4 +580,13 @@ project/
 
 # Run headed on all browsers
 /architect:run-e2e --headed --browsers chromium,firefox,webkit
+
+# Run on specific OpenSpec (skip interactive selection)
+/architect:run-e2e openspec/changes/change-001
+
+# Run on archived OpenSpec
+/architect:run-e2e openspec/changes/archive/change-001
+
+# Run archived spec with options
+/architect:run-e2e openspec/changes/archive/change-001 --headed --browsers chromium,firefox
 ```
