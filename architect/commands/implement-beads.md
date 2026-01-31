@@ -7,7 +7,9 @@ allowed-tools:
 
 # Implement Command
 
-Execute beads in parallel (swarm mode by default) or sequentially (loop mode with --mode flag).
+Execute beads using your choice of execution strategy.
+
+**IMPORTANT**: This command combines loop (sequential) and swarm (parallel) execution modes with interactive selection.
 
 ## Execution Modes
 
@@ -30,7 +32,7 @@ All modes follow the same TDD pattern:
 
 - `--label <label>`: Filter beads by label (e.g., `--label openspec:my-change`) - skips epic selection
 - `--epic <id>`: Execute beads for a specific epic - skips epic selection
-- `--mode <swarm|loop|auto>`: Execution mode (default: swarm)
+- `--mode <swarm|loop|auto>`: Skip mode selection prompt
 - `--workers N`: Maximum concurrent workers for swarm mode (default: 5)
 - `--model MODEL`: Worker model for swarm - `haiku`, `sonnet`, or `opus` (default: opus)
 
@@ -60,7 +62,7 @@ Parse `$ARGUMENTS` for flags:
 
 - `--label <value>` → skip epic selection, use this label
 - `--epic <id>` → skip epic selection, use this epic
-- `--mode <swarm|loop|auto>` → override default (swarm)
+- `--mode <swarm|loop|auto>` → skip mode selection
 - `--workers <N>` (default: 5)
 - `--model <MODEL>` (default: opus)
 
@@ -103,19 +105,26 @@ Use AskUserQuestion with:
 - No epics found → "No epics found. Run `/create-beads` to create beads from an OpenSpec change."
 - No ready beads → "No ready beads. All beads may be completed or blocked."
 
-### Step 4: Determine Execution Mode
+### Step 4: Select Execution Mode (Interactive Mode)
 
-**Default: Swarm mode** (parallel workers for maximum speed).
+**Skip if** `--mode` provided.
 
-- If `--mode loop` → use Loop mode (sequential with confirmation)
-- If `--mode auto` → use Auto Loop mode (sequential without confirmation)
-- If no `--mode` provided → use Swarm mode (default)
+Use AskUserQuestion:
 
-**DO NOT use AskUserQuestion for mode selection. The mode is determined by arguments only.**
+```
+Use AskUserQuestion with:
+- question: "Select execution mode:"
+- header: "Mode"
+- options:
+  - label: "Swarm (Recommended)"
+    description: "Parallel workers - maximum speed, up to N concurrent tasks"
+  - label: "Loop"
+    description: "Sequential - pause after each bead for review"
+  - label: "Auto Loop"
+    description: "Sequential - no pauses, runs until complete"
+```
 
 ### Step 5: Execute Based on Mode
-
-**CRITICAL FOR SWARM MODE: After spawning workers, you MUST enter the monitoring loop and wait for ALL workers to complete. DO NOT return control to the user after spawning. Stay in the loop until all beads are done or blocked.**
 
 ---
 
@@ -145,7 +154,7 @@ From the beads JSON, extract:
 - Status is `pending`
 - All beads in `depends_on` have status `completed`
 
-### Swarm Step 3: Spawn Initial Workers
+### Swarm Step 3: Spawn Workers
 
 For each ready bead (up to `--workers` limit):
 
@@ -194,57 +203,52 @@ For each ready bead (up to `--workers` limit):
 
 3. Track worker assignment: `worker_id → bead_id`
 
-**CRITICAL: After spawning, IMMEDIATELY proceed to Swarm Step 4. DO NOT exit or return to user.**
+### Swarm Step 4: Monitor and Manage Workers (CRITICAL LOOP)
 
-### Swarm Step 4: Wait for Workers (MANDATORY)
-
-**CRITICAL: You MUST wait for ALL workers to complete. DO NOT exit after spawning background tasks.**
-
-Use TaskOutput to wait for each active worker:
+**CRITICAL: You MUST stay in this monitoring loop until ALL beads are complete or blocked. DO NOT exit after spawning workers.**
 
 ```
-For each active worker_id:
-  Use TaskOutput with:
-  - task_id: <worker_id>
-  - block: true
-  - timeout: 300000  # 5 minutes per worker
+WHILE (pending_beads > 0 OR active_workers > 0):
 
-  Parse output for "BEAD COMPLETE: <id>" or "BEAD BLOCKED: <id>"
+    1. WAIT for any worker to complete:
+       - Call TaskOutput(task_id, block=true, timeout=60000) for each active worker
+       - This blocks until a worker finishes or times out
+
+    2. WHEN a worker completes:
+       - Parse output for "BEAD COMPLETE: <id>" or "BEAD BLOCKED: <id>"
+       - If COMPLETE:
+         - Run: bd close <id> --reason "Done"
+         - Remove from active_workers
+       - If BLOCKED:
+         - Run: bd update <id> --status blocked
+         - Report the blocking reason
+         - Remove from active_workers
+
+    3. UPDATE dependency graph:
+       - Refresh ready beads: bd ready -l "<label>" --json
+       - Identify newly unblocked beads (dependencies now satisfied)
+
+    4. SPAWN replacement workers:
+       - For each newly ready bead (up to --workers limit):
+         - Mark as in_progress
+         - Launch worker agent (same as Swarm Step 3)
+         - Add to active_workers
+
+    5. REPORT progress:
+       - Show: "Progress: X/Y beads complete, Z active workers, W blocked"
+
+    6. CONTINUE the loop (go back to step 1)
+
+END WHILE
 ```
 
-**DO NOT proceed to Swarm Step 5 until at least one worker has returned results.**
+**Exit conditions (ONLY exit when one of these is true):**
 
-### Swarm Step 5: Handle Completions and Spawn Replacements
+- All beads have status `completed` → Success
+- All remaining beads are `blocked` with no active workers → Blocked state
+- No more ready beads AND no active workers → Done
 
-For each completed worker:
-
-1. **If COMPLETE:**
-   ```bash
-   bd close <id> --reason "Done"
-   ```
-
-2. **If BLOCKED:**
-   ```bash
-   bd update <id> --status blocked
-   ```
-   Report the blocking reason.
-
-3. **Check for newly ready beads:**
-   ```bash
-   bd ready -l "<label>" --json
-   ```
-
-4. **Spawn replacement workers** for newly ready beads (up to --workers limit):
-   - Same process as Swarm Step 3
-
-5. **Report progress:**
-   ```
-   Progress: X/Y beads complete, Z active workers, W blocked
-   ```
-
-**If there are still pending beads OR active workers → Return to Swarm Step 4.**
-
-**If all beads are complete or blocked AND no active workers → Proceed to Step 6: Report Results.**
+**DO NOT exit just because you spawned workers. You MUST wait for them to finish and spawn new workers for unblocked beads.**
 
 ---
 
@@ -407,9 +411,7 @@ When no ready tasks remain, say: **"All beads complete"**
 
 ---
 
-### Step 6: Report Results (MANDATORY)
-
-**Only reach this step when ALL beads are complete or blocked with no active workers.**
+## Report Results
 
 ```
 ===============================================================
@@ -434,8 +436,6 @@ Test Summary:
 
 ===============================================================
 ```
-
-**END OF COMMAND. Only after displaying this report should you return control to the user.**
 
 ## Progress Visualization
 
@@ -481,19 +481,31 @@ bd show <id>                    # Full task details
 ## Example Usage
 
 ```bash
-# Default swarm mode (select epic interactively)
+# Interactive mode (select epic and mode)
 /implement-beads
 
-# With specific label (skip epic selection, default swarm)
+# With specific label (skip epic selection)
 /implement-beads --label openspec:add-auth
 
-# Sequential with confirmation prompts
-/implement-beads --mode loop
-
-# Sequential without confirmation (hands-off)
-/implement-beads --mode auto
+# With specific mode (skip mode selection)
+/implement-beads --mode swarm
 
 # Full specification
 /implement-beads --label openspec:add-auth --mode swarm --workers 5 --model opus
+
+# Auto loop mode
+/implement-beads --label openspec:refactor --mode auto
 ```
 
+## When to Use Loop vs Swarm
+
+| Situation                               | Use                |
+| --------------------------------------- | ------------------ |
+| Tasks depend heavily on each other      | Loop or Auto Loop  |
+| Want to review each step                | Loop               |
+| Many independent tasks                  | Swarm              |
+| Want maximum speed                      | Swarm              |
+| Debugging issues                        | Loop               |
+| Large refactoring with phases           | Swarm              |
+| Want to fix test failures interactively | Loop               |
+| Tests are stable and expected to pass   | Swarm or Auto Loop |
