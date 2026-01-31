@@ -149,6 +149,46 @@ To update the URL, edit: playwright.config.md
 
 **Do NOT proceed until URL is reachable.**
 
+### Step 4.5: Detect Test Directory from Config
+
+If `playwright.config.ts` exists, parse it to detect the test directory structure:
+
+```bash
+test -f playwright.config.ts && echo "CONFIG_EXISTS" || echo "NO_CONFIG"
+```
+
+**If config exists**, read it and extract:
+
+1. **Authenticated project's testDir**: Look for a project with `name` containing "auth":
+   ```typescript
+   projects: [
+     {
+       name: "chromium-auth",  // or any name containing "auth"
+       testDir: "./tests/authenticated",  // ← Extract this
+       use: { storageState: "..." }
+     }
+   ]
+   ```
+
+2. **Storage state path**: From the authenticated project's `use.storageState`
+
+3. **Fallback to root testDir**: If no authenticated project found, use root `testDir`
+
+**Detection priority:**
+1. Authenticated project's `testDir` (e.g., `./tests/authenticated`)
+2. Root `testDir` setting
+3. Default: `./tests/e2e`
+
+**Store detected values:**
+- `TEST_DIR` = detected test directory (e.g., `apps/web/tests/authenticated`)
+- `STORAGE_STATE_PATH` = detected storage state path (e.g., `playwright/.auth/user.json`)
+- `CONFIG_EXISTS` = true/false
+
+**If no config exists**, use defaults:
+- `TEST_DIR` = `./tests/e2e`
+- `STORAGE_STATE_PATH` = `.auth/state.json`
+- `CONFIG_EXISTS` = false
+
 ### Step 5: Select OpenSpec Change
 
 **If spec-path argument was provided:**
@@ -194,10 +234,10 @@ Read the selected change's proposal.md to get the title.
 
 ### Step 6: Check Existing Tests
 
-Check for existing tests in `tests/e2e/`:
+Check for existing tests in the detected `TEST_DIR`:
 
 ```bash
-ls tests/e2e/*.spec.ts 2>/dev/null || echo "NONE"
+ls ${TEST_DIR}/*.spec.ts 2>/dev/null || echo "NONE"
 ```
 
 If tests exist for this change, ask:
@@ -246,15 +286,44 @@ Build scenario list:
 
 ### Step 8: Generate Test Files
 
-Create `tests/e2e/` directory if needed:
+Create the test directory if needed (using `TEST_DIR` from Step 4.5):
 
 ```bash
-mkdir -p tests/e2e
+mkdir -p ${TEST_DIR}
 ```
 
-Generate Playwright test files, one per capability/requirement:
+#### Step 8.1: Analyze Existing Tests for Patterns
 
-**Translation Rules:**
+**Before generating tests**, read 2-3 existing test files from `${TEST_DIR}` to learn project-specific patterns:
+
+```bash
+ls ${TEST_DIR}/*.spec.ts 2>/dev/null | head -3
+```
+
+For each existing test file, extract and adopt:
+
+| Pattern to Learn | Example |
+|------------------|---------|
+| **Import style** | `import { test, expect } from "@playwright/test"` (quotes, semicolons) |
+| **Selector conventions** | `data-slot="..."`, `data-testid="..."`, or semantic selectors |
+| **Wait strategies** | `waitForLoadState("networkidle")`, `waitForTimeout(2000)` |
+| **Timeout values** | `toBeVisible({ timeout: 15000 })` |
+| **URL patterns** | `/en/articles` (locale prefix), `/api/v1/...` |
+| **Test organization** | Multiple `test.describe` blocks, nesting patterns |
+| **Assertion style** | `expect(locator).toBeVisible()` vs `expect(await locator.isVisible()).toBe(true)` |
+| **Common helpers** | Shared setup, custom fixtures |
+
+**Critical:** Match the existing code style exactly:
+- Same quote style (single vs double)
+- Same semicolon usage
+- Same indentation (tabs vs spaces)
+- Same `test.describe` organization patterns
+
+#### Step 8.2: Generate Tests Using Learned Patterns
+
+Generate Playwright test files following the patterns learned from existing tests.
+
+**Default Translation Rules** (override with patterns from Step 8.1):
 
 | Pattern | Playwright Code |
 |---------|-----------------|
@@ -272,7 +341,7 @@ Generate Playwright test files, one per capability/requirement:
 | THEN button "X" is disabled | `await expect(page.locator('button:has-text("X")')).toBeDisabled()` |
 | THEN input "X" has value "Y" | `await expect(page.locator('input[name="X"]')).toHaveValue('Y')` |
 
-**Test file template:**
+**Test file template** (adapt to match existing test style):
 
 ```typescript
 import { test, expect } from '@playwright/test';
@@ -293,16 +362,16 @@ test.describe('<Requirement Name>', () => {
 });
 ```
 
-Write files to `tests/e2e/<requirement-slug>.spec.ts`
+Write files to `${TEST_DIR}/<requirement-slug>.spec.ts`
 
 ### Step 9: Check Authentication State
 
-Check if valid storage state exists:
+Check if valid storage state exists (using `STORAGE_STATE_PATH` from Step 4.5):
 
 ```bash
-if [ -f ".auth/state.json" ]; then
+if [ -f "${STORAGE_STATE_PATH}" ]; then
   # Check if less than 24 hours old
-  find .auth/state.json -mtime -1 -type f | grep -q . && echo "VALID" || echo "EXPIRED"
+  find "${STORAGE_STATE_PATH}" -mtime -1 -type f | grep -q . && echo "VALID" || echo "EXPIRED"
 else
   echo "NOT_FOUND"
 fi
@@ -322,9 +391,22 @@ Please provide test credentials:
 - Password
 ```
 
-Create auth setup script `.auth/setup.ts`:
+**If `CONFIG_EXISTS` is true** (from Step 4.5), the project already has authentication configured. Check if the detected storage state exists:
+
+```bash
+test -f "${STORAGE_STATE_PATH}" && echo "AUTH_EXISTS" || echo "NEEDS_AUTH"
+```
+
+If `NEEDS_AUTH`, inform the user:
+```
+Storage state not found at: ${STORAGE_STATE_PATH}
+Please run your project's authentication setup before running E2E tests.
+```
+
+**If `CONFIG_EXISTS` is false**, create auth setup script at the detected path's parent directory:
 
 ```typescript
+// File: <parent of STORAGE_STATE_PATH>/setup.ts
 import { chromium, FullConfig } from '@playwright/test';
 
 async function globalSetup(config: FullConfig) {
@@ -340,7 +422,7 @@ async function globalSetup(config: FullConfig) {
   await page.waitForURL('**/*', { timeout: 30000 });
 
   // Save storage state
-  await page.context().storageState({ path: '.auth/state.json' });
+  await page.context().storageState({ path: '${STORAGE_STATE_PATH}' });
   await browser.close();
 }
 
@@ -349,11 +431,11 @@ export default globalSetup;
 
 **Important:** Do NOT run the setup script directly as a test. It must be referenced in `playwright.config.ts` (see Step 11).
 
-Create the `.auth` directory and add to `.gitignore`:
+Create the auth directory and add to `.gitignore`:
 
 ```bash
-mkdir -p .auth
-echo ".auth/" >> .gitignore
+mkdir -p $(dirname "${STORAGE_STATE_PATH}")
+echo "$(dirname "${STORAGE_STATE_PATH}")/" >> .gitignore
 ```
 
 The auth setup will run automatically via `globalSetup` when you run `npx playwright test`.
@@ -362,7 +444,7 @@ The auth setup will run automatically via `globalSetup` when you run `npx playwr
 
 ```bash
 # Delete existing state to force re-auth
-rm -f .auth/state.json
+rm -f "${STORAGE_STATE_PATH}"
 
 # Run any test - globalSetup will execute first
 npx playwright test --grep ".*" --max-failures=1
@@ -370,25 +452,27 @@ npx playwright test --grep ".*" --max-failures=1
 
 Verify success:
 ```bash
-test -f .auth/state.json && echo "AUTH_SUCCESS" || echo "AUTH_FAILED"
+test -f "${STORAGE_STATE_PATH}" && echo "AUTH_SUCCESS" || echo "AUTH_FAILED"
 ```
 
 If AUTH_FAILED, show error and ask user to check credentials/selectors in playwright.config.md.
 
-### Step 11: Create Playwright Config
+### Step 11: Create Playwright Config (if needed)
 
-If `playwright.config.ts` doesn't exist, create it:
+**If `CONFIG_EXISTS` is true** (from Step 4.5), skip this step entirely. The project already has a Playwright configuration.
+
+**If `CONFIG_EXISTS` is false**, create `playwright.config.ts`:
 
 ```typescript
 import { defineConfig, devices } from '@playwright/test';
 import * as fs from 'fs';
 
 // Conditionally use storage state only if it exists
-const storageStatePath = '.auth/state.json';
+const storageStatePath = '${STORAGE_STATE_PATH}';
 const useStorageState = fs.existsSync(storageStatePath) ? { storageState: storageStatePath } : {};
 
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: '${TEST_DIR}',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -399,7 +483,7 @@ export default defineConfig({
   ],
 
   // Global setup for authentication
-  globalSetup: require.resolve('./.auth/setup.ts'),
+  globalSetup: require.resolve('./${STORAGE_STATE_PATH}/../setup.ts'),
 
   use: {
     baseURL: '<BASE_URL>',
@@ -545,16 +629,17 @@ Include failure details in bead description.
 
 ## File Structure
 
-After running this command:
+After running this command (paths vary based on project configuration):
 
+**New project (no existing config):**
 ```
 project/
-├── .gitignore                # Should contain ".auth/" entry
+├── .gitignore                # Should contain auth directory entry
 ├── playwright.config.md      # Strategy file (user-maintained)
 ├── playwright.config.ts      # Playwright config (generated)
 ├── .auth/                    # IMPORTANT: Add to .gitignore!
 │   ├── setup.ts              # Auth setup script (globalSetup)
-│   └── state.json            # Storage state (reused <24h, may contain tokens)
+│   └── state.json            # Storage state (reused <24h)
 ├── tests/
 │   └── e2e/
 │       ├── <capability>.spec.ts
@@ -564,7 +649,23 @@ project/
     └── index.html            # HTML report
 ```
 
-**Security Note:** The `.auth/` directory contains credentials and tokens. Always ensure it's in `.gitignore`.
+**Existing project (e.g., monorepo with auth config):**
+```
+project/
+├── playwright.config.ts      # Existing config (not modified)
+├── playwright/
+│   └── .auth/
+│       └── user.json         # Existing storage state path
+├── apps/
+│   └── web/
+│       └── tests/
+│           └── authenticated/    # Detected TEST_DIR
+│               ├── <capability>.spec.ts
+│               └── ...
+└── test-results.json
+```
+
+**Security Note:** The auth directory (wherever located) contains credentials and tokens. Always ensure it's in `.gitignore`.
 
 ## Example Usage
 
