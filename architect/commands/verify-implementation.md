@@ -1,5 +1,5 @@
 ---
-allowed-tools: Task, TaskOutput, Bash, Read, Glob, Grep, Edit, Write, AskUserQuestion
+allowed-tools: Task, TaskOutput, Bash, Read, Glob, Grep, AskUserQuestion
 argument-hint: "[openspec-change-path]"
 description: Post-implementation verification using parallel specialized agents
 ---
@@ -243,6 +243,8 @@ By Agent:
 **If findings exist**: Proceed IMMEDIATELY to Step 8. Do NOT ask the user if they want to fix all findings at once. Do NOT present a batch fix option. Show findings ONE AT A TIME.
 
 ### Step 8: Interactive Fix Loop
+
+**CRITICAL: DO NOT apply fixes directly in this command. You do NOT have Edit tool access. ALL fixes MUST be delegated to the fix-finding agent using the Task tool. The fix-finding agent has the Edit tool and will apply the fix, run verification, and return the result.**
 
 Process findings in severity order: P1 first, then P2, then P3.
 
