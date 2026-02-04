@@ -173,6 +173,25 @@ For multiple specs: Create one epic per spec, respect depends_on between specs.
 
 Use `subagent_type: "beads-default"` and `run_in_background: true`.
 
+### Step 5.5: Wait for Agent Completion
+
+Wait for the beads-default agent to complete:
+
+```
+Use TaskOutput with:
+- task_id: <agent_id from Step 5>
+- block: true
+- timeout: 300000
+```
+
+**CRITICAL: DO NOT proceed to Step 6 until the agent has completed. The TaskOutput call will block until the agent finishes creating beads.**
+
+Parse the agent response for:
+- Epic ID
+- Bead counts (test/impl/non-testable)
+- Quality metrics
+- Any errors
+
 ### Step 6: Report Result
 
 **For single spec:**
