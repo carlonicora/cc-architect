@@ -154,6 +154,23 @@ From the beads JSON, extract:
 - Status is `pending`
 - All beads in `depends_on` have status `completed`
 
+### Swarm Step 2.5: Extract OpenSpec Metadata
+
+For each bead, before spawning a worker, extract OpenSpec metadata:
+
+1. Check if bead has an `openspec:*` label
+2. If yes, extract the change name (e.g., `openspec:add-auth` → `add-auth`)
+3. Get the full bead description with `bd show <id>`
+4. Parse the description to find the task number:
+   - Look for `**Task**: X.X from tasks.md` in the Context Chain section
+   - Extract the task number (e.g., "1.1", "2.3")
+
+**If Context Chain is missing or malformed:**
+
+- Set OpenSpec Task to `"unknown"`
+- Worker will skip OpenSpec update and log a warning
+- The bead can still complete successfully (implementation is valid)
+
 ### Swarm Step 3: Spawn Workers
 
 For each ready bead (up to `--workers` limit):
@@ -177,6 +194,8 @@ For each ready bead (up to `--workers` limit):
        Bead ID: <id>
        Title: <title>
        Bead Type: <test | impl | non-testable>
+       OpenSpec Label: <openspec:change-name or "none">
+       OpenSpec Task: <task number from Context Chain, e.g., "1.1", or "unknown" if not found>
 
        ## Task Description
        <full bead description from bd show>
@@ -193,8 +212,18 @@ For each ready bead (up to `--workers` limit):
        6. If tests FAIL: Output "BEAD BLOCKED: <id> - Tests failed: <summary>"
        7. If tests PASS: Continue to completion
 
-       ## OpenSpec Update
-       8. If this bead has an `openspec:` label: Edit `openspec/changes/<name>/tasks.md` to mark the corresponding task as `[x]`
+       ## OpenSpec Update (REQUIRED if OpenSpec Label is not "none")
+
+       8. Mark the task as complete in tasks.md:
+          - If OpenSpec Task is "unknown", skip this step and log: "WARNING: Could not find task number in Context Chain, skipping OpenSpec update"
+          - Open: `openspec/changes/<change-name>/tasks.md` (use change-name from OpenSpec Label)
+          - Find the line starting with: `- [ ] <OpenSpec Task>` (e.g., `- [ ] 1.1`)
+          - Change `[ ]` to `[x]` (keep everything else the same)
+
+          Example:
+          - Before: `- [ ] 1.1 Create useResponsive hook`
+          - After:  `- [x] 1.1 Create useResponsive hook`
+
        9. Report success or failure
 
        When complete, output: "BEAD COMPLETE: <id>"
@@ -350,17 +379,26 @@ bd close <id> --reason "Done: <brief summary>"
 
 **IMPORTANT**: If working on an OpenSpec change (label starts with `openspec:`):
 
-Edit `openspec/changes/<name>/tasks.md` to mark that task complete:
+1. Find the task number in the bead's **Context Chain** section:
+   ```
+   **Task**: X.X from tasks.md
+   ```
 
-```markdown
-# Before
+2. If Context Chain is missing or malformed, **skip this step** and log a warning:
+   ```
+   WARNING: Could not find task number in Context Chain, skipping OpenSpec update
+   ```
+   The bead can still complete successfully.
 
-- [ ] Task description here
+3. Edit `openspec/changes/<name>/tasks.md` to mark that task complete:
+   - Find the line starting with: `- [ ] X.X` (matching the task number)
+   - Change `[ ]` to `[x]` (keep everything else the same)
 
-# After
+   Example:
+   - Before: `- [ ] 1.1 Create useResponsive hook`
+   - After:  `- [x] 1.1 Create useResponsive hook`
 
-- [x] Task description here
-```
+4. This applies to ALL beads with `openspec:*` label (including test beads).
 
 ### Loop Step 8: Repeat or Pause
 
