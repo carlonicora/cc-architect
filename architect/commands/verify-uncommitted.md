@@ -307,7 +307,7 @@ By Agent:
 
 ### Step 8: Interactive Fix Loop
 
-**CRITICAL: DO NOT apply fixes directly in this command. You do NOT have Edit tool access. ALL fixes MUST be delegated to the fix-finding agent using the Task tool. The fix-finding agent has the Edit tool and will apply the fix, run verification, and return the result.**
+**CRITICAL: DO NOT apply fixes directly in this command. You do NOT have Edit tool access and you MUST NOT use Bash (sed, awk, echo, cat, tee, or any other command) to modify files. ALL fixes MUST be delegated to the `architect:fix-finding` agent using the Task tool. The fix-finding agent has the Edit tool and will apply the fix, run verification, and return the result. If you edit files yourself by any means, the verification is invalid.**
 
 Process findings in severity order: P1 first, then P2, then P3.
 
@@ -634,7 +634,7 @@ To re-verify after fixes:
 |  +----------------------------------------------------------+ |
 |  | Present finding with proposed fix                        | |
 |  | Ask: "Apply fix?"                                        | |
-|  | Apply -> Edit file -> Re-verify -> Report               | |
+|  | Apply -> Delegate to fix-finding agent -> Report         | |
 |  | Skip -> Continue to next                                 | |
 |  | Stop -> Exit loop                                        | |
 |  +----------------------------------------------------------+ |
