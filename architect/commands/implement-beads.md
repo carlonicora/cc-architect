@@ -245,75 +245,67 @@ For each ready bead (up to `--workers` limit):
 
 ---
 
-**MONITORING LOOP - MANDATORY UNTIL ALL WORK COMPLETE:**
+### ⛔ STOP - MANDATORY BLOCKING WAIT ⛔
 
-WHILE (`active_workers` is not empty OR there are pending ready beads):
+**You have spawned background workers. You MUST NOT continue until they complete.**
 
-#### Step A: Wait for Workers (BLOCKING - DO NOT SKIP)
+**EXECUTE NOW - Call TaskOutput for EACH worker:**
 
-For EACH `task_id` in `active_workers`:
+Take your first `task_id` from `active_workers` and execute this tool call:
 
 ```
-Use TaskOutput tool with:
-- task_id: <task_id>
-- block: true
-- timeout: 180000
+TaskOutput(task_id="<first_task_id>", block=true, timeout=180000)
 ```
 
-**This call BLOCKS until the worker completes. DO NOT proceed until you receive output.**
+Wait for the result. Then call TaskOutput for the next worker. Repeat for ALL workers.
 
-Parse the output for:
-- `"BEAD COMPLETE: <id>"` → worker succeeded
-- `"BEAD BLOCKED: <id>"` → worker failed/blocked
+**Example:** If you spawned 3 workers with task_ids `abc123`, `def456`, `ghi789`:
 
-#### Step B: Process Completed Workers
+1. Call `TaskOutput(task_id="abc123", block=true, timeout=180000)` - WAIT for result
+2. Call `TaskOutput(task_id="def456", block=true, timeout=180000)` - WAIT for result
+3. Call `TaskOutput(task_id="ghi789", block=true, timeout=180000)` - WAIT for result
 
-For each completed worker:
-- If COMPLETE: Run `bd close <id> --reason "Done"`
-- If BLOCKED: Run `bd update <id> --status blocked`
-- Remove from `active_workers` map
-- Increment `completed_count` or `blocked_count`
-
-#### Step C: Check for Newly Ready Beads
-
-```bash
-bd ready -l "<label>" --json
-```
-
-Identify beads that are now ready (dependencies satisfied).
-
-#### Step D: Spawn Replacement Workers
-
-For each newly ready bead (up to `--workers` limit minus current active):
-- Mark as in_progress: `bd update <id> --status in_progress`
-- Launch worker (same as Swarm Step 3)
-- Add `task_id → bead_id` to `active_workers` map
-
-#### Step E: Report Progress
-
-Output: `"Progress: X/Y beads complete, Z active workers, W blocked"`
-
-#### Step F: CONTINUE THE LOOP
-
-**Go back to Step A. DO NOT EXIT.**
+**You MUST make these TaskOutput tool calls NOW. Do not just print "Waiting..." and exit.**
 
 ---
 
-**END LOOP** - Only exit when:
-- `active_workers` is empty AND no ready beads remain
-- All beads are `completed` or `blocked`
+### After Each Worker Completes
+
+When TaskOutput returns, parse the output:
+
+- If output contains `"BEAD COMPLETE: <id>"`:
+  - Run: `bd close <id> --reason "Done"`
+  - Worker succeeded
+
+- If output contains `"BEAD BLOCKED: <id>"`:
+  - Run: `bd update <id> --status blocked`
+  - Worker failed
+
+Remove the completed worker from your tracking.
 
 ---
 
-**VERIFICATION: Before reporting results, confirm:**
+### After ALL Workers Complete
 
-- [ ] `active_workers` map is empty (all workers finished)
-- [ ] No beads with status `pending` have all dependencies satisfied
-- [ ] Either all beads are `completed` OR remaining beads are `blocked`
+1. **Check for newly ready beads:**
+   ```bash
+   bd ready -l "<label>" --json
+   ```
 
-**If any check fails, you exited the loop prematurely. Go back to the monitoring loop.**
+2. **If there are newly ready beads:** Spawn new workers (up to `--workers` limit) and go back to "STOP - MANDATORY BLOCKING WAIT" above.
 
-**DO NOT exit just because you spawned workers. You MUST call TaskOutput for each worker and wait for completion before exiting.**
+3. **If no more ready beads:** Report final results and exit.
+
+---
+
+### Exit Conditions (ONLY exit when ALL of these are true)
+
+- [ ] ALL TaskOutput calls have been made and returned
+- [ ] `active_workers` is empty
+- [ ] No beads with `pending` status have satisfied dependencies
+- [ ] All beads are either `completed` or `blocked`
+
+**If you have active workers and haven't called TaskOutput for each one, GO BACK and call TaskOutput NOW.**
 
 ---
 
