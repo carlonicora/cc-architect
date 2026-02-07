@@ -234,50 +234,86 @@ For each ready bead (up to `--workers` limit):
 
 ### Swarm Step 4: Monitor and Manage Workers (CRITICAL LOOP)
 
-**CRITICAL: You MUST stay in this monitoring loop until ALL beads are complete or blocked. DO NOT exit after spawning workers.**
+**CRITICAL: DO NOT EXIT after spawning workers. You MUST stay in the monitoring loop and call TaskOutput for EACH active worker. The loop only ends when ALL beads are complete or blocked with zero active workers.**
+
+**Initialize tracking before entering the loop:**
+
+- `active_workers`: map of `task_id → bead_id` for all spawned workers
+- `completed_count`: 0
+- `blocked_count`: 0
+- `total_beads`: count of all beads for this label
+
+---
+
+**MONITORING LOOP - MANDATORY UNTIL ALL WORK COMPLETE:**
+
+WHILE (`active_workers` is not empty OR there are pending ready beads):
+
+#### Step A: Wait for Workers (BLOCKING - DO NOT SKIP)
+
+For EACH `task_id` in `active_workers`:
 
 ```
-WHILE (pending_beads > 0 OR active_workers > 0):
-
-    1. WAIT for any worker to complete:
-       - Call TaskOutput(task_id, block=true, timeout=60000) for each active worker
-       - This blocks until a worker finishes or times out
-
-    2. WHEN a worker completes:
-       - Parse output for "BEAD COMPLETE: <id>" or "BEAD BLOCKED: <id>"
-       - If COMPLETE:
-         - Run: bd close <id> --reason "Done"
-         - Remove from active_workers
-       - If BLOCKED:
-         - Run: bd update <id> --status blocked
-         - Report the blocking reason
-         - Remove from active_workers
-
-    3. UPDATE dependency graph:
-       - Refresh ready beads: bd ready -l "<label>" --json
-       - Identify newly unblocked beads (dependencies now satisfied)
-
-    4. SPAWN replacement workers:
-       - For each newly ready bead (up to --workers limit):
-         - Mark as in_progress
-         - Launch worker agent (same as Swarm Step 3)
-         - Add to active_workers
-
-    5. REPORT progress:
-       - Show: "Progress: X/Y beads complete, Z active workers, W blocked"
-
-    6. CONTINUE the loop (go back to step 1)
-
-END WHILE
+Use TaskOutput tool with:
+- task_id: <task_id>
+- block: true
+- timeout: 180000
 ```
 
-**Exit conditions (ONLY exit when one of these is true):**
+**This call BLOCKS until the worker completes. DO NOT proceed until you receive output.**
 
-- All beads have status `completed` → Success
-- All remaining beads are `blocked` with no active workers → Blocked state
-- No more ready beads AND no active workers → Done
+Parse the output for:
+- `"BEAD COMPLETE: <id>"` → worker succeeded
+- `"BEAD BLOCKED: <id>"` → worker failed/blocked
 
-**DO NOT exit just because you spawned workers. You MUST wait for them to finish and spawn new workers for unblocked beads.**
+#### Step B: Process Completed Workers
+
+For each completed worker:
+- If COMPLETE: Run `bd close <id> --reason "Done"`
+- If BLOCKED: Run `bd update <id> --status blocked`
+- Remove from `active_workers` map
+- Increment `completed_count` or `blocked_count`
+
+#### Step C: Check for Newly Ready Beads
+
+```bash
+bd ready -l "<label>" --json
+```
+
+Identify beads that are now ready (dependencies satisfied).
+
+#### Step D: Spawn Replacement Workers
+
+For each newly ready bead (up to `--workers` limit minus current active):
+- Mark as in_progress: `bd update <id> --status in_progress`
+- Launch worker (same as Swarm Step 3)
+- Add `task_id → bead_id` to `active_workers` map
+
+#### Step E: Report Progress
+
+Output: `"Progress: X/Y beads complete, Z active workers, W blocked"`
+
+#### Step F: CONTINUE THE LOOP
+
+**Go back to Step A. DO NOT EXIT.**
+
+---
+
+**END LOOP** - Only exit when:
+- `active_workers` is empty AND no ready beads remain
+- All beads are `completed` or `blocked`
+
+---
+
+**VERIFICATION: Before reporting results, confirm:**
+
+- [ ] `active_workers` map is empty (all workers finished)
+- [ ] No beads with status `pending` have all dependencies satisfied
+- [ ] Either all beads are `completed` OR remaining beads are `blocked`
+
+**If any check fails, you exited the loop prematurely. Go back to the monitoring loop.**
+
+**DO NOT exit just because you spawned workers. You MUST call TaskOutput for each worker and wait for completion before exiting.**
 
 ---
 
