@@ -307,13 +307,29 @@ By Agent:
 
 **If findings exist**: Proceed IMMEDIATELY to Step 9.
 
-### Step 9: Interactive Fix Loop
+### Step 9: Interactive Fix Loop (ONE BY ONE)
 
-**CRITICAL: DO NOT apply fixes directly in this command. You do NOT have Edit tool access and you MUST NOT use Bash (sed, awk, echo, cat, tee, or any other command) to modify files. ALL fixes MUST be delegated to the `architect:fix-finding` agent using the Task tool. The fix-finding agent has the Edit tool and will apply the fix to design.md or tests.md.**
+**CRITICAL REQUIREMENTS:**
 
-Process findings in severity order: P1 first, then P2, then P3.
+1. **ONE BY ONE**: Present each finding individually. After presenting ONE finding, use AskUserQuestion to get the user's decision. Only after the user responds, move to the next finding. NEVER batch findings or show multiple at once.
 
-**For each P1 finding:**
+2. **NO DIRECT EDITS**: You do NOT have Edit tool access. You MUST NOT use Bash (sed, awk, echo, cat, tee, or any command) to modify files. ALL fixes MUST be delegated to the `architect:fix-finding` agent.
+
+3. **WAIT FOR USER**: After each AskUserQuestion, wait for the user's response before proceeding.
+
+**Process:**
+```
+for each finding in sorted_findings (P1 first, then P2, then P3):
+    1. Present THIS ONE finding with full details
+    2. Use AskUserQuestion to ask what user wants to do
+    3. WAIT for user response
+    4. Execute user's choice (Apply/Skip/Stop)
+    5. ONLY THEN move to next finding
+```
+
+---
+
+**For each P1 finding (one at a time):**
 
 Present the finding:
 ```
@@ -444,9 +460,9 @@ Wait for agent completion, then parse the JSON result:
 - Exit loop
 - Show summary of remaining issues
 
-**For P2 findings:**
+**For P2 findings (one at a time):**
 
-Same process as P1, but with these options:
+Same ONE BY ONE process as P1. Present each P2 finding individually, wait for user response, then proceed to next:
 ```
 Use AskUserQuestion with:
 - question: "Apply fix for <finding.id>: <finding.title>?"
@@ -464,7 +480,7 @@ Use AskUserQuestion with:
 
 **For P3 findings:**
 
-Show summary instead of individual fixes:
+Show a summary first, then ask user preference:
 ```
 ===============================================================
 P3 - NICE-TO-HAVE FINDINGS (<count>)
@@ -486,8 +502,11 @@ Use AskUserQuestion with:
   - label: "Skip all"
     description: "Skip all P3 findings and finish"
   - label: "Review each"
-    description: "Go through P3 findings one by one"
+    description: "Go through P3 findings ONE BY ONE"
 ```
+
+**If "Review each":**
+Process P3 findings the same way as P1/P2 - present each finding individually, ask user what to do, wait for response, then proceed to next.
 
 ### Step 10: Final Report
 
@@ -637,16 +656,20 @@ To re-verify after fixes:
                                     │
                                     ▼
 ┌───────────────────────────────────────────────────────────────┐
-│                    INTERACTIVE FIX LOOP                        │
+│              INTERACTIVE FIX LOOP (ONE BY ONE)                 │
 │                                                               │
-│  For each finding (P1 first, then P2, then P3):              │
+│  For EACH finding individually (P1 first, then P2, then P3): │
 │  ┌─────────────────────────────────────────────────────────┐  │
-│  │ Present finding with proposed fix                       │  │
-│  │ Ask: "Apply fix?"                                       │  │
-│  │ Apply → Delegate to fix-finding → edit design.md/tests  │  │
-│  │ Skip → Continue to next                                 │  │
-│  │ Stop → Exit loop                                        │  │
+│  │ 1. Present ONE finding with full details                │  │
+│  │ 2. AskUserQuestion: "Apply fix?"                        │  │
+│  │ 3. WAIT for user response                               │  │
+│  │ 4. Apply → Delegate to fix-finding agent                │  │
+│  │    Skip → Mark as skipped                               │  │
+│  │    Stop → Exit loop                                     │  │
+│  │ 5. ONLY THEN proceed to next finding                    │  │
 │  └─────────────────────────────────────────────────────────┘  │
+│                                                               │
+│  NEVER batch findings. ALWAYS one at a time.                  │
 └───────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
