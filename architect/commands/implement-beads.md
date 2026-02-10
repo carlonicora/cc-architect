@@ -311,198 +311,61 @@ Remove the completed worker from your tracking.
 
 ## MODE: LOOP / AUTO LOOP
 
-Execute beads iteratively until all ready tasks are complete.
+**⛔ RULE: Spawn `architect:bead-worker` for EVERY bead. NEVER implement directly.**
 
----
-
-### ⛔ CRITICAL: NEVER IMPLEMENT DIRECTLY ⛔
-
-**You MUST delegate ALL bead work to the `architect:bead-worker` agent.**
-
-**PROHIBITED ACTIONS in Loop mode:**
-- ❌ Reading implementation files directly (let worker do it)
-- ❌ Using Edit tool on source code (let worker do it)
-- ❌ Running tests directly (let worker do it)
-- ❌ Modifying OpenSpec tasks.md (let worker do it)
-
-**REQUIRED ACTIONS in Loop mode:**
-- ✅ Use `bd` commands to find/show/update beads
-- ✅ Spawn `architect:bead-worker` via Task tool
-- ✅ Wait for worker JSON result
-- ✅ Close bead based on result
-
-**WHY:** Direct implementation bloats your context window. After a few beads, you become useless. Workers keep their context isolated.
-
----
-
-### Loop Step 1: Find Ready Work
-
-```bash
-bd ready -l "<label>"
-```
-
-Shows tasks with no blockers, sorted by priority.
-
-### Loop Step 2: Pick a Task
-
-Select the highest priority ready task. Note its ID.
-
-### Loop Step 3: Read Task Details
-
-```bash
-bd show <id>
-```
-
-The task description should be self-contained with requirements, acceptance criteria, and files to modify.
-
-### Loop Step 4: Start Working
-
-```bash
-bd update <id> --status in_progress
-```
-
-### Loop Step 5: Delegate to Worker
-
----
-
-### ⛔ STOP - MANDATORY DELEGATION ⛔
-
-**DO NOT implement this bead yourself. You MUST delegate to a worker agent.**
-
-**If you are tempted to:**
-- Read source files → STOP. Spawn the worker instead.
-- Edit code directly → STOP. Spawn the worker instead.
-- Run tests yourself → STOP. Spawn the worker instead.
-
-**EXECUTE NOW:**
-
----
-
-1. **Extract bead metadata** from `bd show` output:
-   - Bead type: Check for `type:test`, `type:impl`, or `no-test:*` labels
-   - OpenSpec label: Look for `openspec:<change-name>` label
-   - OpenSpec task: Parse Context Chain section for `**Task**: X.X from tasks.md`
-
-2. **Spawn the worker NOW:**
+### The Loop
 
 ```
-Use Task tool with:
+REPEAT until no ready beads:
+  1. bd ready -l "<label>"           # Find next bead
+  2. bd show <id>                    # Get description
+  3. bd update <id> --status in_progress
+  4. Task(bead-worker) ← SPAWN       # Worker implements, you wait
+  5. Parse JSON result → bd close or bd update --status blocked
+  6. Show progress, pause if Loop mode
+```
+
+### Step 4: Spawn Worker (MANDATORY)
+
+Extract from `bd show`: bead type (`type:test`/`type:impl`/`no-test:*`), OpenSpec label, task number from Context Chain.
+
+```
+Task tool:
 - subagent_type: "architect:bead-worker"
-- model: <selected model or opus>
-- run_in_background: false  # Wait for result (blocking)
+- model: opus
+- run_in_background: false
 - prompt: |
-    Execute this bead task:
-
     Bead ID: <id>
     Title: <title>
     Bead Type: <test | impl | non-testable>
-    OpenSpec Label: <openspec:change-name or "none">
-    OpenSpec Task: <task number from Context Chain, e.g., "1.1", or "unknown" if not found>
+    OpenSpec Label: <openspec:X or "none">
+    OpenSpec Task: <X.X or "unknown">
 
     ## Task Description
-    <full bead description from bd show>
+    <full bd show output>
 
-    Execute the bead and return JSON result.
+    Execute and return JSON.
 ```
 
-3. **Wait for the Task tool to return the worker's JSON result.** Do NOT proceed until you have the result.
+### Step 5: Handle Result
 
-### Loop Step 6: Handle Worker Result
+**COMPLETE** → `bd close <id> --reason "<summary>"` → Output: `✓ <id> - <summary>`
 
-Parse the JSON result from worker:
+**BLOCKED** → `bd update <id> --status blocked` → Output: `✗ <id> - <error>`
+- Loop mode: AskUserQuestion (Skip/Retry/Stop)
+- Auto Loop: Continue to next
 
-**If status == "COMPLETE":**
+### Step 6: Continue
 
-1. Close the bead:
-   ```bash
-   bd close <id> --reason "<summary from worker>"
-   ```
-
-2. Output summary (keeps main context minimal):
-   ```
-   ✓ BEAD COMPLETE: <id> - <summary>
-     Files: <files_modified>
-     Tests: <test_result>
-   ```
-
-**If status == "BLOCKED":**
-
-1. Update bead status:
-   ```bash
-   bd update <id> --status blocked
-   ```
-
-2. Output error:
-   ```
-   ✗ BEAD BLOCKED: <id> - <error>
-   ```
-
-3. **In Loop mode:** Ask user how to proceed (see below)
-4. **In Auto Loop mode:** Continue to next bead
-
-### Blocked Bead Handling (Loop mode only)
-
+**Loop mode:** AskUserQuestion before next bead
 ```
-Use AskUserQuestion with:
-- question: "Bead blocked: <bead-id>. <error summary>. What would you like to do?"
-- header: "Blocked"
-- options:
-  - label: "Skip and continue"
-    description: "Leave bead blocked, proceed to next ready bead"
-  - label: "Retry"
-    description: "Run the worker again on this bead"
-  - label: "Stop"
-    description: "Stop the loop and review manually"
+question: "Next: <id> (<title>). Continue?"
+options: Continue (spawn worker) | Stop | <other-bead-id>
 ```
 
-Based on response:
-- **Skip and continue**: Proceed to next ready bead
-- **Retry**: Go back to Step 5 for the same bead
-- **Stop**: End the loop and report progress
+**Auto Loop:** Go directly to step 1
 
-### Loop Step 7: Repeat or Pause
-
-**In Loop mode (step):** Use AskUserQuestion to pause for human control.
-
-**In Auto Loop mode:** Continue to next ready bead immediately.
-
-**Before pausing, show progress (summary only - details stay in worker context):**
-
-```
-===============================================================
-Progress: N/M beads complete
-Blocked: B beads
-
-EXECUTION ORDER (remaining):
-  Next → <bead-id>: <title>
-  Then → <bead-id>: <title>
-===============================================================
-```
-
-**Then use AskUserQuestion (Loop mode only):**
-
-```
-Use AskUserQuestion with:
-- question: "Next: <next-bead-id> (<title>). Continue?"
-- header: "Next step"
-- options:
-  - label: "Continue (Recommended)"
-    description: "Proceed to <next-bead-id>: <title>"
-  - label: "Stop"
-    description: "End the implementation loop here"
-  - label: "<other-bead-id>"
-    description: "Skip to: <other-bead-title>"
-```
-
-Based on the response:
-
-- **Continue**: Proceed to next in execution order (go to Step 1)
-- **Stop**: End the loop and report progress
-- **Specific bead ID**: Work on that bead next
-
-### Loop Completion
-
-When no ready tasks remain, say: **"All beads complete"**
+**Done:** When `bd ready` returns empty → "All beads complete"
 
 ---
 
