@@ -339,114 +339,108 @@ The task description should be self-contained with requirements, acceptance crit
 bd update <id> --status in_progress
 ```
 
-### Loop Step 5: Implement the Task
+### Loop Step 5: Delegate to Worker
 
-Follow the task description:
+**IMPORTANT**: Delegate bead execution to a worker agent to keep the main context clean. The worker handles all implementation, testing, and OpenSpec updates.
 
-1. Read the files mentioned
-2. Make the required changes
-3. Run any tests/verification in acceptance criteria
+1. **Extract bead metadata** from `bd show` output:
+   - Bead type: Check for `type:test`, `type:impl`, or `no-test:*` labels
+   - OpenSpec label: Look for `openspec:<change-name>` label
+   - OpenSpec task: Parse Context Chain section for `**Task**: X.X from tasks.md`
 
-**TypeScript LSP (when available):** For TypeScript/JavaScript code, use LSP tools for better accuracy:
+2. **Delegate to worker:**
 
-- `documentSymbol` - Find symbols in a file
-- `findReferences` - Find all usages of a symbol
-- `goToDefinition` - Navigate to symbol definition
-- `workspaceSymbol` - Search symbols across workspace
+```
+Use Task tool with:
+- subagent_type: "architect:bead-worker"
+- model: <selected model or opus>
+- run_in_background: false  # Wait for result
+- prompt: |
+    Execute this bead task:
 
-### Loop Step 5.5: Run Tests (for implementation beads)
+    Bead ID: <id>
+    Title: <title>
+    Bead Type: <test | impl | non-testable>
+    OpenSpec Label: <openspec:change-name or "none">
+    OpenSpec Task: <task number from Context Chain, e.g., "1.1", or "unknown" if not found>
 
-**Skip if** bead has label `type:test` or `no-test:*` (test beads and non-testable beads don't run test validation)
+    ## Task Description
+    <full bead description from bd show>
 
-**For implementation beads (label `type:impl`):**
+    Execute the bead and return JSON result.
+```
 
-1. **Find associated test file:**
-   - Parse bead description for "Test File:" path
-   - Or derive from implementation file: `src/foo.ts` → `src/foo.test.ts`
+3. **Wait for agent completion**, then parse the JSON result.
 
-2. **Run tests:**
+### Loop Step 6: Handle Worker Result
 
+Parse the JSON result from worker:
+
+**If status == "COMPLETE":**
+
+1. Close the bead:
    ```bash
-   npx vitest run <test-file-path> --reporter=verbose
+   bd close <id> --reason "<summary from worker>"
    ```
 
-3. **Validate result:**
-   - Exit code 0 → Tests pass → Proceed to close bead
-   - Exit code != 0 → Tests fail → DO NOT close bead
+2. Output summary (keeps main context minimal):
+   ```
+   ✓ BEAD COMPLETE: <id> - <summary>
+     Files: <files_modified>
+     Tests: <test_result>
+   ```
 
-4. **If tests fail:**
-   - Report which tests failed
-   - Keep bead in `in_progress` status
-   - Ask user how to proceed (Loop mode)
-   - Mark as blocked (Auto Loop mode)
+**If status == "BLOCKED":**
 
-### Test Failure Handling (Loop mode)
+1. Update bead status:
+   ```bash
+   bd update <id> --status blocked
+   ```
+
+2. Output error:
+   ```
+   ✗ BEAD BLOCKED: <id> - <error>
+   ```
+
+3. **In Loop mode:** Ask user how to proceed (see below)
+4. **In Auto Loop mode:** Continue to next bead
+
+### Blocked Bead Handling (Loop mode only)
 
 ```
 Use AskUserQuestion with:
-- question: "Tests failed for <bead-id>. What would you like to do?"
-- header: "Test Fail"
+- question: "Bead blocked: <bead-id>. <error summary>. What would you like to do?"
+- header: "Blocked"
 - options:
-  - label: "Review and fix"
-    description: "Stay on this bead and fix the implementation"
-  - label: "Skip (mark blocked)"
-    description: "Mark bead as blocked and continue to next"
+  - label: "Skip and continue"
+    description: "Leave bead blocked, proceed to next ready bead"
+  - label: "Retry"
+    description: "Run the worker again on this bead"
   - label: "Stop"
     description: "Stop the loop and review manually"
 ```
 
-### Loop Step 6: Complete the Task
+Based on response:
+- **Skip and continue**: Proceed to next ready bead
+- **Retry**: Go back to Step 5 for the same bead
+- **Stop**: End the loop and report progress
 
-**Only proceed if tests pass (for impl beads) or bead is test/non-testable.**
-
-```bash
-bd close <id> --reason "Done: <brief summary>"
-```
-
-### Loop Step 7: Update OpenSpec (if applicable)
-
-**IMPORTANT**: If working on an OpenSpec change (label starts with `openspec:`):
-
-1. Find the task number in the bead's **Context Chain** section:
-   ```
-   **Task**: X.X from tasks.md
-   ```
-
-2. If Context Chain is missing or malformed, **skip this step** and log a warning:
-   ```
-   WARNING: Could not find task number in Context Chain, skipping OpenSpec update
-   ```
-   The bead can still complete successfully.
-
-3. Edit `openspec/changes/<name>/tasks.md` to mark that task complete:
-   - Find the line starting with: `- [ ] X.X` (matching the task number)
-   - Change `[ ]` to `[x]` (keep everything else the same)
-
-   Example:
-   - Before: `- [ ] 1.1 Create useResponsive hook`
-   - After:  `- [x] 1.1 Create useResponsive hook`
-
-4. This applies to ALL beads with `openspec:*` label (including test beads).
-
-### Loop Step 8: Repeat or Pause
+### Loop Step 7: Repeat or Pause
 
 **In Loop mode (step):** Use AskUserQuestion to pause for human control.
 
 **In Auto Loop mode:** Continue to next ready bead immediately.
 
-**Before pausing, output execution status:**
+**Before pausing, show progress (summary only - details stay in worker context):**
 
 ```
 ===============================================================
-BEAD COMPLETED: <bead-id>
-===============================================================
-
 Progress: N/M beads complete
+Blocked: B beads
 
 EXECUTION ORDER (remaining):
-  Next → <bead-id>: <title> (P0)
-  Then → <bead-id>: <title> (P0)
-  Then → <bead-id>: <title> (P1, blocked until P0 done)
+  Next → <bead-id>: <title>
+  Then → <bead-id>: <title>
 ===============================================================
 ```
 
@@ -454,7 +448,7 @@ EXECUTION ORDER (remaining):
 
 ```
 Use AskUserQuestion with:
-- question: "Bead complete. Next: <next-bead-id> (<title>). Continue?"
+- question: "Next: <next-bead-id> (<title>). Continue?"
 - header: "Next step"
 - options:
   - label: "Continue (Recommended)"
@@ -467,7 +461,7 @@ Use AskUserQuestion with:
 
 Based on the response:
 
-- **Continue**: Proceed to next in execution order
+- **Continue**: Proceed to next in execution order (go to Step 1)
 - **Stop**: End the loop and report progress
 - **Specific bead ID**: Work on that bead next
 
