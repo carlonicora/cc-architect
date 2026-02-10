@@ -1,6 +1,6 @@
 {
   "name": "cc-architect",
-  "version": "2.3.10",
+  "version": "2.4.0",
   "description": "OpenSpec + Beads based workflow for claude code",
   "author": "carlonicora",
   "owner": {
@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "architect",
-      "version": "2.3.10",
+      "version": "2.4.0",
       "description": "Development architect for claude code using OpenSpec and Beads",
       "source": "./architect"
     }
