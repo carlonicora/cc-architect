@@ -167,6 +167,26 @@ Each bead must be SELF-CONTAINED:
 - Include exact file paths
 - Include acceptance criteria
 
+## 🚨 CRITICAL: Architecture Guide in EVERY Impl Bead
+
+EVERY implementation bead (type:impl) MUST start with this section at the TOP of the description:
+
+```
+🚨 CRITICAL: Architecture Guide Required
+
+BEFORE writing ANY code, you MUST:
+
+1. **Read the Architecture Index**: `docs/architecture/INDEX.md`
+2. **Follow the Quick Reference table** to find which docs apply to your task
+3. **Read only the relevant architecture docs** for this specific task
+
+⚠️ Failure to follow documented patterns will result in broken code.
+
+---
+```
+
+This MUST be the FIRST thing in every impl bead description, BEFORE Context Chain.
+
 For single spec: Create epic first, then child tasks with --parent.
 For multiple specs: Create one epic per spec, respect depends_on between specs.
 ```
