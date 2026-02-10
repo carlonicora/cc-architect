@@ -313,6 +313,28 @@ Remove the completed worker from your tracking.
 
 Execute beads iteratively until all ready tasks are complete.
 
+---
+
+### ⛔ CRITICAL: NEVER IMPLEMENT DIRECTLY ⛔
+
+**You MUST delegate ALL bead work to the `architect:bead-worker` agent.**
+
+**PROHIBITED ACTIONS in Loop mode:**
+- ❌ Reading implementation files directly (let worker do it)
+- ❌ Using Edit tool on source code (let worker do it)
+- ❌ Running tests directly (let worker do it)
+- ❌ Modifying OpenSpec tasks.md (let worker do it)
+
+**REQUIRED ACTIONS in Loop mode:**
+- ✅ Use `bd` commands to find/show/update beads
+- ✅ Spawn `architect:bead-worker` via Task tool
+- ✅ Wait for worker JSON result
+- ✅ Close bead based on result
+
+**WHY:** Direct implementation bloats your context window. After a few beads, you become useless. Workers keep their context isolated.
+
+---
+
 ### Loop Step 1: Find Ready Work
 
 ```bash
@@ -341,20 +363,33 @@ bd update <id> --status in_progress
 
 ### Loop Step 5: Delegate to Worker
 
-**IMPORTANT**: Delegate bead execution to a worker agent to keep the main context clean. The worker handles all implementation, testing, and OpenSpec updates.
+---
+
+### ⛔ STOP - MANDATORY DELEGATION ⛔
+
+**DO NOT implement this bead yourself. You MUST delegate to a worker agent.**
+
+**If you are tempted to:**
+- Read source files → STOP. Spawn the worker instead.
+- Edit code directly → STOP. Spawn the worker instead.
+- Run tests yourself → STOP. Spawn the worker instead.
+
+**EXECUTE NOW:**
+
+---
 
 1. **Extract bead metadata** from `bd show` output:
    - Bead type: Check for `type:test`, `type:impl`, or `no-test:*` labels
    - OpenSpec label: Look for `openspec:<change-name>` label
    - OpenSpec task: Parse Context Chain section for `**Task**: X.X from tasks.md`
 
-2. **Delegate to worker:**
+2. **Spawn the worker NOW:**
 
 ```
 Use Task tool with:
 - subagent_type: "architect:bead-worker"
 - model: <selected model or opus>
-- run_in_background: false  # Wait for result
+- run_in_background: false  # Wait for result (blocking)
 - prompt: |
     Execute this bead task:
 
@@ -370,7 +405,7 @@ Use Task tool with:
     Execute the bead and return JSON result.
 ```
 
-3. **Wait for agent completion**, then parse the JSON result.
+3. **Wait for the Task tool to return the worker's JSON result.** Do NOT proceed until you have the result.
 
 ### Loop Step 6: Handle Worker Result
 
