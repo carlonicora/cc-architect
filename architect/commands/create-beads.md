@@ -319,11 +319,30 @@ bd create "Add JWT validation" -t task -p 2 \
   --parent <epic-id> \
   -l "openspec:add-auth" \
   -l "type:impl" \
-  -d "## Context Chain
+  -d "🚨 CRITICAL: Architecture Guide Required
+
+BEFORE writing ANY code, you MUST:
+
+1. **Read the Architecture Index**: \`docs/architecture/INDEX.md\`
+2. **Follow the Quick Reference table** to find which docs apply to your task
+3. **Read only the relevant architecture docs** for this specific task
+
+⚠️ Failure to follow documented patterns will result in broken code.
+
+---
+
+## Associated Test Bead (TDD)
+
+**Test Bead ID**: <test-bead-id>
+**Test File**: \`src/auth.test.ts\`
+
+---
+
+## Context Chain (for disaster recovery ONLY)
 
 **Spec Reference**: openspec/changes/add-auth/specs/auth/spec.md
-**Test Bead ID**: <test-bead-id>
-**Test File**: src/auth.test.ts
+**Plan Reference**: <plan-path>
+**Task**: <task number> from tasks.md
 
 ## Requirements
 <copied from spec - FULL text>
