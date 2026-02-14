@@ -1,5 +1,5 @@
 ---
-description: "Gracefully stop any active implementation (loop or swarm)"
+description: "Gracefully stop any active implementation (loop, swarm, or agent teams)"
 allowed-tools: ["Bash", "Task", "TaskOutput"]
 argument-hint: ""
 ---
@@ -8,7 +8,7 @@ argument-hint: ""
 
 Gracefully stop any active implementation while preserving progress.
 
-**Works with:** `/implement-beads` command (all modes: Swarm, Loop, Auto Loop)
+**Works with:** `/implement-beads` (Swarm, Loop, Auto Loop) and `/implement-team-beads` (Agent Teams)
 
 ## Instructions
 
@@ -39,8 +39,12 @@ Pending Beads: P
 Progress is preserved. Completed beads remain closed.
 In-progress beads remain in_progress.
 
-Note: Swarm workers may complete their current task before stopping.
+Note: Swarm workers and Agent Teams teammates may complete their
+current task before stopping.
 Check status in a moment with: bd list
+
+For Agent Teams: tell the lead to shut down all teammates and
+clean up the team.
 
 ===============================================================
 ```
@@ -56,7 +60,8 @@ To check current status:
   bd list --status in_progress    # Find current work
 
 To resume:
-  /implement-beads
+  /implement-beads                # Swarm, Loop, Auto Loop
+  /implement-team-beads           # Agent Teams
 ```
 
 ## Data Preservation
@@ -65,15 +70,15 @@ To resume:
 - **In-progress tasks**: Remain in_progress (swarm workers may complete)
 - **Pending tasks**: Remain pending
 
-The beads database preserves all state. You can resume at any time with `/implement-beads`.
+The beads database preserves all state. You can resume at any time with `/implement-beads` or `/implement-team-beads`.
 
-## Swarm vs Loop Cancellation
+## Cancellation by Mode
 
-| Aspect | Loop/Auto Loop | Swarm |
-|--------|----------------|-------|
-| Stops | Single foreground agent | Multiple background workers |
-| Immediate | Yes | Workers may finish current task |
-| State | Deterministic | Check `bd list` after a moment |
+| Aspect | Loop/Auto Loop | Swarm | Agent Teams |
+|--------|----------------|-------|-------------|
+| Stops | Single foreground agent | Multiple background workers | Lead shuts down teammates, cleans up team |
+| Immediate | Yes | Workers may finish current task | Teammates may finish current task |
+| State | Deterministic | Check `bd list` after a moment | Check `bd list` after a moment |
 
 ## Example Output
 
@@ -92,13 +97,15 @@ Pending Beads: 4
 Progress is preserved. Completed beads remain closed.
 In-progress beads remain in_progress.
 
-Note: Swarm workers may complete their current task before stopping.
+Note: Swarm workers and Agent Teams teammates may complete their
+current task before stopping.
 
 To check status:
   bd list
 
 To resume:
-  /implement-beads
+  /implement-beads                # Swarm, Loop, Auto Loop
+  /implement-team-beads           # Agent Teams
 
 ===============================================================
 ```
